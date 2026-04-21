@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Środowisko
+.env
+*.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Dane
+data/
+models/
+qdrant_storage/
+ollama_models/
+langfuse_db/
+
+# Logi
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python packaging
+dist/
+build/

@@ -1,0 +1,23 @@
+model_list:
+  - model_name: local-llm
+    litellm_params:
+      model: ollama/llama3.1:8b
+      api_base: http://ollama:11434
+
+  - model_name: local-llm-small
+    litellm_params:
+      model: ollama/qwen2.5:3b
+      api_base: http://ollama:11434
+
+  # Odkomentuj aby używać OpenAI / Anthropic:
+  # - model_name: gpt-4o-mini
+  #   litellm_params:
+  #     model: openai/gpt-4o-mini
+  #     api_key: os.environ/OPENAI_API_KEY
+
+general_settings:
+  master_key: sk-researchmind-local
+
+litellm_settings:
+  drop_params: true
+  set_verbose: false

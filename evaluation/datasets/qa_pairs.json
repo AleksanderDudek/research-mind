@@ -1,0 +1,14 @@
+[
+  {
+    "question": "What is retrieval-augmented generation?",
+    "ground_truth": "Retrieval-augmented generation (RAG) is a technique that combines information retrieval with language model generation. It retrieves relevant documents from a knowledge base and uses them as context to generate accurate, grounded answers."
+  },
+  {
+    "question": "How does dense passage retrieval work?",
+    "ground_truth": "Dense passage retrieval (DPR) encodes questions and passages into dense vector representations using dual-encoder neural networks. Similarity between a question and a passage is measured by the dot product of their embeddings, enabling efficient retrieval via approximate nearest neighbour search."
+  },
+  {
+    "question": "What are the main limitations of large language models?",
+    "ground_truth": "Large language models suffer from hallucinations (generating plausible but false information), knowledge cutoffs (not knowing recent events), lack of source attribution, high computational cost, and potential for biased or harmful outputs."
+  }
+]
