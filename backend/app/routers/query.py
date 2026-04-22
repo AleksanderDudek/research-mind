@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from loguru import logger
 
@@ -7,10 +9,23 @@ from app.services.vector_store import VectorStore
 from app.agents.research_agent import ResearchAgent
 
 router = APIRouter(prefix="/query", tags=["query"])
-embedder = Embedder()
-store = VectorStore()
-agent = ResearchAgent()
 
+
+def get_embedder() -> Embedder:
+    return Embedder()
+
+
+def get_store() -> VectorStore:
+    return VectorStore()
+
+
+def get_agent() -> ResearchAgent:
+    return ResearchAgent()
+
+
+EmbedderDep = Annotated[Embedder, Depends(get_embedder)]
+StoreDep = Annotated[VectorStore, Depends(get_store)]
+AgentDep = Annotated[ResearchAgent, Depends(get_agent)]
 
 _500 = {500: {"description": "Internal server error"}}
 
@@ -26,7 +41,7 @@ class AskRequest(BaseModel):
 
 
 @router.get("/documents", responses=_500)
-async def list_documents() -> dict:
+async def list_documents(store: StoreDep) -> dict:
     """Lista wszystkich zaindeksowanych dokumentów."""
     try:
         docs = store.list_documents()
@@ -37,7 +52,7 @@ async def list_documents() -> dict:
 
 
 @router.post("/search", responses=_500)
-async def semantic_search(req: SearchRequest) -> dict:
+async def semantic_search(req: SearchRequest, embedder: EmbedderDep, store: StoreDep) -> dict:
     """Wyszukiwanie semantyczne bez LLM (tylko retrieval)."""
     try:
         vec = embedder.embed_one(req.question)
@@ -61,7 +76,7 @@ async def semantic_search(req: SearchRequest) -> dict:
 
 
 @router.post("/ask", responses=_500)
-async def ask_agent(req: AskRequest) -> dict:
+async def ask_agent(req: AskRequest, agent: AgentDep) -> dict:
     """Zapytanie do agenta LangGraph z pełnym workflow."""
     try:
         result = await agent.run(req.question)
