@@ -30,6 +30,7 @@ class AgentState(TypedDict):
     critique: dict
     iteration: int
     messages: Annotated[list, operator.add]
+    context_id: str | None
 
 
 class ResearchAgent:
@@ -77,7 +78,8 @@ class ResearchAgent:
 
     def retrieve_node(self, state: AgentState) -> AgentState:
         vec = self.embedder.embed_one(state["question"])
-        hits = self.store.search(vec, top_k=5)
+        filters = {"context_id": state["context_id"]} if state.get("context_id") else None
+        hits = self.store.search(vec, top_k=5, filters=filters)
         context = [
             {
                 "text": h.payload.get("text"),
@@ -133,7 +135,7 @@ class ResearchAgent:
             return "retry"
         return "done"
 
-    async def run(self, question: str) -> dict:
+    async def run(self, question: str, context_id: str | None = None) -> dict:
         initial_state: AgentState = {
             "question": question,
             "action": "",
@@ -142,6 +144,7 @@ class ResearchAgent:
             "critique": {},
             "iteration": 0,
             "messages": [],
+            "context_id": context_id,
         }
         final = await self.graph.ainvoke(initial_state)
         return {

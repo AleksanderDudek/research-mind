@@ -11,16 +11,13 @@ class VectorStore:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             if settings.qdrant_local_path:
-                # Embedded mode — no server required, data persisted to disk
                 cls._instance.client = QdrantClient(path=settings.qdrant_local_path)
             elif settings.qdrant_api_key:
-                # Qdrant Cloud — managed cluster with API key auth
                 cls._instance.client = QdrantClient(
                     url=f"https://{settings.qdrant_host}",
                     api_key=settings.qdrant_api_key,
                 )
             else:
-                # Self-hosted server
                 cls._instance.client = QdrantClient(
                     host=settings.qdrant_host,
                     port=settings.qdrant_port,
@@ -40,26 +37,28 @@ class VectorStore:
                     distance=Distance.COSINE,
                 ),
             )
-            self.client.create_payload_index(
-                collection_name=self.collection,
-                field_name="source_type",
-                field_schema=models.PayloadSchemaType.KEYWORD,
-            )
-            self.client.create_payload_index(
-                collection_name=self.collection,
-                field_name="document_id",
-                field_schema=models.PayloadSchemaType.KEYWORD,
-            )
+            for field in ("source_type", "document_id", "context_id"):
+                self.client.create_payload_index(
+                    collection_name=self.collection,
+                    field_name=field,
+                    field_schema=models.PayloadSchemaType.KEYWORD,
+                )
 
-    def list_documents(self) -> list[dict]:
+    def list_documents(self, context_id: str | None = None) -> list[dict]:
         seen: set[str] = set()
         results: list[dict] = []
         offset = None
+        scroll_filter = None
+        if context_id is not None:
+            scroll_filter = models.Filter(must=[
+                models.FieldCondition(key="context_id", match=models.MatchValue(value=context_id))
+            ])
         while True:
             records, offset = self.client.scroll(
                 collection_name=self.collection,
                 limit=100,
                 offset=offset,
+                scroll_filter=scroll_filter,
                 with_payload=True,
                 with_vectors=False,
             )
@@ -72,6 +71,7 @@ class VectorStore:
                         "title": r.payload.get("title") or r.payload.get("source", ""),
                         "source_type": r.payload.get("source_type", ""),
                         "ingested_at": r.payload.get("ingested_at", ""),
+                        "context_id": r.payload.get("context_id"),
                     })
             if offset is None:
                 break
@@ -86,13 +86,13 @@ class VectorStore:
         top_k: int = 5,
         filters: dict[str, str] | None = None,
     ) -> list:
-        query_filter = None
+        conditions = []
         if filters:
             conditions = [
                 models.FieldCondition(key=k, match=models.MatchValue(value=v))
                 for k, v in filters.items()
             ]
-            query_filter = models.Filter(must=conditions)
+        query_filter = models.Filter(must=conditions) if conditions else None
 
         return self.client.search(
             collection_name=self.collection,
@@ -100,3 +100,24 @@ class VectorStore:
             limit=top_k,
             query_filter=query_filter,
         )
+
+    def delete_by_document(self, document_id: str, context_id: str | None = None) -> None:
+        must = [models.FieldCondition(key="document_id", match=models.MatchValue(value=document_id))]
+        if context_id:
+            must.append(models.FieldCondition(key="context_id", match=models.MatchValue(value=context_id)))
+        self.client.delete(
+            collection_name=self.collection,
+            points_selector=models.FilterSelector(filter=models.Filter(must=must)),
+        )
+        logger.info(f"Deleted vectors for document {document_id!r}")
+
+    def delete_by_context(self, context_id: str) -> None:
+        self.client.delete(
+            collection_name=self.collection,
+            points_selector=models.FilterSelector(
+                filter=models.Filter(must=[
+                    models.FieldCondition(key="context_id", match=models.MatchValue(value=context_id))
+                ])
+            ),
+        )
+        logger.info(f"Deleted all vectors for context {context_id!r}")
