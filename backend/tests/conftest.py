@@ -22,3 +22,11 @@ def client():
     from app.main import app  # import after env vars are set
     with TestClient(app) as c:
         yield c
+
+
+@pytest.fixture(scope="session")
+def context_id(client):
+    """Creates one shared test context for the whole test session."""
+    r = client.post("/contexts", json={"name": "Test Context"})
+    assert r.status_code == 200
+    return r.json()["context_id"]

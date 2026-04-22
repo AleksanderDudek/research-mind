@@ -7,25 +7,19 @@ import uuid
 from datetime import datetime, timezone
 
 from loguru import logger
-from qdrant_client import QdrantClient, models
+from qdrant_client import models
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
 from app.config import settings
+from app.services._qdrant import get_client
 
 _DUMMY_VEC = [0.0]
 _LEGACY_ID = "00000000-0000-0000-0000-000000000000"
 _LEGACY_NAME = "Imported data"
 
 
-def _client() -> QdrantClient:
-    if settings.qdrant_local_path:
-        return QdrantClient(path=settings.qdrant_local_path)
-    if settings.qdrant_api_key:
-        return QdrantClient(url=f"https://{settings.qdrant_host}", api_key=settings.qdrant_api_key)
-    return QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
-
-
-def _ensure_collection(client: QdrantClient) -> None:
+def _ensure_collection() -> None:
+    client = get_client()
     names = [c.name for c in client.get_collections().collections]
     if settings.qdrant_contexts_collection not in names:
         logger.info(f"Creating collection: {settings.qdrant_contexts_collection}")
@@ -38,11 +32,11 @@ def _ensure_collection(client: QdrantClient) -> None:
             field_name="context_id",
             field_schema=models.PayloadSchemaType.KEYWORD,
         )
-        _seed_legacy(client)
+        _seed_legacy()
 
 
-def _seed_legacy(client: QdrantClient) -> None:
-    """Create the __legacy__ context for pre-existing data without context_id."""
+def _seed_legacy() -> None:
+    client = get_client()
     client.upsert(
         collection_name=settings.qdrant_contexts_collection,
         points=[
@@ -63,8 +57,8 @@ def _seed_legacy(client: QdrantClient) -> None:
 # ── Public API ─────────────────────────────────────────────────────────────────
 
 def list_contexts() -> list[dict]:
-    client = _client()
-    _ensure_collection(client)
+    client = get_client()
+    _ensure_collection()
     results, _ = client.scroll(
         collection_name=settings.qdrant_contexts_collection,
         limit=500,
@@ -75,8 +69,8 @@ def list_contexts() -> list[dict]:
 
 
 def get_context(context_id: str) -> dict | None:
-    client = _client()
-    _ensure_collection(client)
+    client = get_client()
+    _ensure_collection()
     results = client.retrieve(
         collection_name=settings.qdrant_contexts_collection,
         ids=[context_id],
@@ -86,8 +80,8 @@ def get_context(context_id: str) -> dict | None:
 
 
 def create_context(name: str | None = None) -> dict:
-    client = _client()
-    _ensure_collection(client)
+    client = get_client()
+    _ensure_collection()
     context_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
     if not name:
@@ -107,8 +101,8 @@ def create_context(name: str | None = None) -> dict:
 
 
 def rename_context(context_id: str, name: str) -> dict | None:
-    client = _client()
-    _ensure_collection(client)
+    client = get_client()
+    _ensure_collection()
     existing = get_context(context_id)
     if not existing:
         return None
@@ -122,8 +116,8 @@ def rename_context(context_id: str, name: str) -> dict | None:
 
 
 def delete_context(context_id: str) -> bool:
-    client = _client()
-    _ensure_collection(client)
+    client = get_client()
+    _ensure_collection()
     existing = get_context(context_id)
     if not existing:
         return False

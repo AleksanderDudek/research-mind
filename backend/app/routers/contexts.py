@@ -23,6 +23,9 @@ from app.services.ingestion import IngestionService
 
 router = APIRouter(prefix="/contexts", tags=["contexts"])
 
+_404 = {404: {"description": "Not found"}}
+_400 = {400: {"description": "Bad request"}}
+
 
 def get_store() -> VectorStore:
     return VectorStore()
@@ -61,7 +64,7 @@ def post_context(req: CreateRequest) -> dict:
     return create_context(req.name)
 
 
-@router.patch("/{context_id}")
+@router.patch("/{context_id}", responses=_404)
 def patch_context(context_id: str, req: RenameRequest) -> dict:
     result = rename_context(context_id, req.name)
     if result is None:
@@ -69,7 +72,7 @@ def patch_context(context_id: str, req: RenameRequest) -> dict:
     return result
 
 
-@router.delete("/{context_id}")
+@router.delete("/{context_id}", responses=_404)
 def delete_context_endpoint(context_id: str, store: StoreDep) -> dict:
     if not get_context(context_id):
         raise HTTPException(status_code=404, detail="Context not found")
@@ -88,7 +91,7 @@ def get_sources(context_id: str) -> list:
     return list_sources(context_id)
 
 
-@router.get("/{context_id}/sources/{document_id}/text")
+@router.get("/{context_id}/sources/{document_id}/text", responses=_404)
 def get_source_text(context_id: str, document_id: str) -> dict:
     source = get_source(context_id, document_id)
     if source is None:
@@ -96,7 +99,7 @@ def get_source_text(context_id: str, document_id: str) -> dict:
     return {"raw_text": source.get("raw_text", ""), "title": source.get("title", ""), "source_type": source.get("source_type", "")}
 
 
-@router.put("/{context_id}/sources/{document_id}")
+@router.put("/{context_id}/sources/{document_id}", responses={**_404, **_400})
 def edit_source(
     context_id: str,
     document_id: str,
@@ -123,7 +126,7 @@ def edit_source(
 @router.delete("/{context_id}/sources/{document_id}")
 def delete_source_endpoint(context_id: str, document_id: str, store: StoreDep) -> dict:
     store.delete_by_document(document_id, context_id=context_id)
-    delete_source(context_id, document_id)
+    delete_source(document_id)
     return {"deleted": document_id}
 
 

@@ -23,7 +23,7 @@ class IngestionService:
         self.pdf_parser = PDFParser()
         self.scraper = WebScraper()
 
-    async def ingest_text(
+    def ingest_text(
         self,
         text: str,
         source_type: str,
@@ -84,12 +84,12 @@ class IngestionService:
             "metadata": base_meta,
         }
 
-    async def ingest_pdf_bytes(
+    def ingest_pdf_bytes(
         self, pdf_bytes: bytes, source: str, context_id: str
     ) -> dict:
         text = self.pdf_parser.parse_bytes(pdf_bytes)
         pdf_meta = self.pdf_parser.metadata(pdf_bytes)
-        return await self.ingest_text(
+        return self.ingest_text(
             text=text,
             source_type="pdf",
             context_id=context_id,
@@ -98,21 +98,21 @@ class IngestionService:
 
     async def ingest_pdf_url(self, url: str, context_id: str) -> dict:
         pdf_bytes = await self.scraper.fetch_pdf(url)
-        return await self.ingest_pdf_bytes(pdf_bytes, source=url, context_id=context_id)
+        return self.ingest_pdf_bytes(pdf_bytes, source=url, context_id=context_id)
 
     async def ingest_web_url(self, url: str, context_id: str) -> dict:
         text, meta = await self.scraper.fetch_and_extract(url)
-        return await self.ingest_text(
+        return self.ingest_text(
             text=text,
             source_type="web",
             context_id=context_id,
             metadata={"source": url, **meta},
         )
 
-    async def ingest_raw_text(
+    def ingest_raw_text(
         self, text: str, title: str, context_id: str
     ) -> dict:
-        return await self.ingest_text(
+        return self.ingest_text(
             text=text,
             source_type="text",
             context_id=context_id,
@@ -130,7 +130,7 @@ class IngestionService:
     ) -> dict:
         """Delete old chunks for document_id and re-index with new_text."""
         self.store.delete_by_document(document_id, context_id=context_id)
-        delete_source(context_id, document_id)
+        delete_source(document_id)
 
         chunks = self.chunker.split(new_text)
         if not chunks:
