@@ -19,10 +19,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set lowercase owner
-        id: owner
-        run: echo "value=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
-
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
@@ -36,7 +32,7 @@ jobs:
         uses: google-github-actions/deploy-cloudrun@v2
         with:
           service: researchmind-backend
-          image: ghcr.io/${{ steps.owner.outputs.value }}/researchmind-backend:latest
+          image: europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/researchmind/researchmind-backend:latest
           region: ${{ vars.GCP_REGION }}
           project_id: ${{ secrets.GCP_PROJECT_ID }}
           flags: >-
@@ -60,10 +56,11 @@ jobs:
             QDRANT_API_KEY=${{ secrets.QDRANT_API_KEY }}
 
       - name: Deploy frontend
+        id: frontend
         uses: google-github-actions/deploy-cloudrun@v2
         with:
           service: researchmind-frontend
-          image: ghcr.io/${{ steps.owner.outputs.value }}/researchmind-frontend:latest
+          image: europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/researchmind/researchmind-frontend:latest
           region: ${{ vars.GCP_REGION }}
           project_id: ${{ secrets.GCP_PROJECT_ID }}
           flags: >-
@@ -78,4 +75,4 @@ jobs:
       - name: Print URLs
         run: |
           echo "Backend:  ${{ steps.backend.outputs.url }}"
-          echo "Frontend: open Cloud Run console for frontend URL"
+          echo "Frontend: ${{ steps.frontend.outputs.url }}"
