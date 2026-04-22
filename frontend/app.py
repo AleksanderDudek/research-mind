@@ -6,7 +6,7 @@ import streamlit.components.v1 as components
 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8001")
 
-# ── i18n ──────────────────────────────────────────────────────────────────────
+# ── i18n ───────────────────────────────────────────────────────────────────────
 
 TRANSLATIONS: dict[str, dict[str, str]] = {
     "pl": {
@@ -29,10 +29,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "label_text_title": "Tytuł (opcjonalnie)",
         "label_text_area": "Wklej tekst",
         "btn_text": "Zindeksuj tekst",
-        "spinner_pdf": "Pobieranie i przetwarzanie...",
-        "spinner_web": "Scrapowanie...",
-        "spinner_upload": "Przetwarzanie...",
-        "spinner_index": "Indeksowanie...",
+        "status_sending": "Wysyłanie do backendu...",
+        "status_processing": "Przetwarzanie dokumentu...",
+        "status_done": "Gotowe!",
+        "status_error": "Błąd",
         "spinner_agent": "Agent myśli...",
         "success_chunks": "Zindeksowano {} fragmentów",
         "warn_too_short": "Tekst musi mieć co najmniej 50 znaków.",
@@ -63,10 +63,10 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "label_text_title": "Title (optional)",
         "label_text_area": "Paste text",
         "btn_text": "Index text",
-        "spinner_pdf": "Downloading and processing...",
-        "spinner_web": "Scraping...",
-        "spinner_upload": "Processing...",
-        "spinner_index": "Indexing...",
+        "status_sending": "Sending to backend...",
+        "status_processing": "Processing document...",
+        "status_done": "Done!",
+        "status_error": "Error",
         "spinner_agent": "Agent is thinking...",
         "success_chunks": "Indexed {} chunks",
         "warn_too_short": "Text must be at least 50 characters.",
@@ -79,7 +79,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
     },
 }
 
-# ── Browser language detection (runs once, before lang param is set) ──────────
+# ── Browser language detection ─────────────────────────────────────────────────
 
 components.html("""
 <script>
@@ -106,6 +106,68 @@ st.set_page_config(page_title=T["page_title"], page_icon="📚", layout="wide")
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# ── Global CSS ─────────────────────────────────────────────────────────────────
+
+st.markdown("""
+<style>
+/* Top loading bar while Streamlit is rerunning */
+div[data-testid="stApp"][data-stale="true"]::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 3px;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        #FF4B4B 40%,
+        #FF4B4B 60%,
+        transparent 100%
+    );
+    background-size: 300% 100%;
+    animation: topbar 1.2s ease-in-out infinite;
+    z-index: 999999;
+}
+@keyframes topbar {
+    0%   { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+}
+
+/* Dim content while stale instead of freezing visually */
+div[data-testid="stApp"][data-stale="true"] > div {
+    opacity: 0.6;
+    transition: opacity 0.15s ease;
+    pointer-events: none;
+}
+div[data-testid="stApp"][data-stale="false"] > div {
+    opacity: 1;
+    transition: opacity 0.2s ease;
+}
+
+/* Skeleton pulse for chat messages */
+.skeleton {
+    background: linear-gradient(90deg, #2a2a2a 25%, #3a3a3a 50%, #2a2a2a 75%);
+    background-size: 200% 100%;
+    animation: skeleton-pulse 1.4s infinite;
+    border-radius: 6px;
+    height: 16px;
+    margin: 6px 0;
+}
+@keyframes skeleton-pulse {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Smooth fade-in for new chat messages */
+div[data-testid="stChatMessage"] {
+    animation: msg-in 0.25s ease-out;
+}
+@keyframes msg-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+</style>
+""", unsafe_allow_html=True)
+
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -124,16 +186,29 @@ def api_post(path: str, json_data: dict | None = None, files: dict | None = None
         return r.json()
 
 
-# ── SIDEBAR ────────────────────────────────────────────────────────────────────
+def _ingest_with_status(fn, *args, **kwargs):
+    """Run an ingestion call wrapped in st.status for step-by-step feedback."""
+    with st.status(T["status_sending"], expanded=True) as status:
+        try:
+            st.write(T["status_processing"])
+            res = fn(*args, **kwargs)
+            status.update(label=T["status_done"], state="complete", expanded=False)
+            st.success(T["success_chunks"].format(res["chunks_ingested"]))
+            st.json(res)
+        except Exception as e:
+            status.update(label=T["status_error"], state="error", expanded=True)
+            st.error(T["error_prefix"].format(e))
 
-with st.sidebar:
-    # Language toggle
+
+# ── SIDEBAR — isolated fragment (won't rerun chat on submit) ───────────────────
+
+@st.fragment
+def sidebar_content() -> None:
     st.markdown(
         f'<a href="?lang={T["lang_toggle_target"]}" target="_self">{T["lang_toggle"]}</a>',
         unsafe_allow_html=True,
     )
     st.divider()
-
     st.title(T["sidebar_title"])
 
     tab1, tab2, tab3, tab4 = st.tabs([
@@ -141,98 +216,94 @@ with st.sidebar:
     ])
 
     with tab1:
-        pdf_url = st.text_input(T["label_pdf_url"], placeholder=T["ph_pdf_url"])
+        pdf_url = st.text_input(T["label_pdf_url"], placeholder=T["ph_pdf_url"], key="in_pdf_url")
         if st.button(T["btn_pdf_url"], key="pdf_url_btn") and pdf_url:
-            with st.spinner(T["spinner_pdf"]):
-                try:
-                    res = api_post("/ingest/pdf-url", {"url": pdf_url})
-                    st.success(T["success_chunks"].format(res["chunks_ingested"]))
-                    st.json(res)
-                except Exception as e:
-                    st.error(T["error_prefix"].format(e))
+            _ingest_with_status(api_post, "/ingest/pdf-url", {"url": pdf_url})
 
     with tab2:
-        web_url = st.text_input(T["label_web_url"], placeholder=T["ph_web_url"])
+        web_url = st.text_input(T["label_web_url"], placeholder=T["ph_web_url"], key="in_web_url")
         if st.button(T["btn_web_url"], key="web_url_btn") and web_url:
-            with st.spinner(T["spinner_web"]):
-                try:
-                    res = api_post("/ingest/web-url", {"url": web_url})
-                    st.success(T["success_chunks"].format(res["chunks_ingested"]))
-                    st.json(res)
-                except Exception as e:
-                    st.error(T["error_prefix"].format(e))
+            _ingest_with_status(api_post, "/ingest/web-url", {"url": web_url})
 
     with tab3:
-        uploaded = st.file_uploader(T["label_upload"], type=["pdf"])
+        uploaded = st.file_uploader(T["label_upload"], type=["pdf"], key="in_upload")
         if uploaded and st.button(T["btn_upload"], key="upload_btn"):
-            with st.spinner(T["spinner_upload"]):
-                try:
-                    files = {"file": (uploaded.name, uploaded.getvalue(), "application/pdf")}
-                    res = api_post("/ingest/pdf-upload", files=files)
-                    st.success(T["success_chunks"].format(res["chunks_ingested"]))
-                    st.json(res)
-                except Exception as e:
-                    st.error(T["error_prefix"].format(e))
+            files = {"file": (uploaded.name, uploaded.getvalue(), "application/pdf")}
+            _ingest_with_status(api_post, "/ingest/pdf-upload", files=files)
 
     with tab4:
-        text_title = st.text_input(T["label_text_title"], value="Manual paste")
-        pasted_text = st.text_area(T["label_text_area"], height=200)
+        text_title = st.text_input(T["label_text_title"], value="Manual paste", key="in_title")
+        pasted_text = st.text_area(T["label_text_area"], height=200, key="in_text")
         if st.button(T["btn_text"], key="text_btn"):
             if len(pasted_text.strip()) >= 50:
-                with st.spinner(T["spinner_index"]):
-                    try:
-                        res = api_post("/ingest/raw-text", {"text": pasted_text, "title": text_title})
-                        st.success(T["success_chunks"].format(res["chunks_ingested"]))
-                    except Exception as e:
-                        st.error(T["error_prefix"].format(e))
+                _ingest_with_status(api_post, "/ingest/raw-text", {"text": pasted_text, "title": text_title})
             else:
                 st.warning(T["warn_too_short"])
 
 
-# ── MAIN: Chat ─────────────────────────────────────────────────────────────────
+with st.sidebar:
+    sidebar_content()
 
-st.title(T["app_title"])
-st.caption(T["app_caption"])
 
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-        if "sources" in msg and msg["sources"]:
-            with st.expander(T["sources_label"].format(len(msg["sources"]))):
-                for i, src in enumerate(msg["sources"], 1):
-                    st.markdown(
-                        f"**[{i}]** `{src.get('source', 'unknown')}` "
-                        f"(score: {src.get('score', 0):.3f})"
-                    )
-                    st.text(str(src.get("text", ""))[:500] + "...")
+# ── MAIN CHAT — isolated fragment (won't rerun sidebar on message) ─────────────
 
-if prompt := st.chat_input(T["chat_placeholder"]):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+@st.fragment
+def chat_content() -> None:
+    st.title(T["app_title"])
+    st.caption(T["app_caption"])
 
-    with st.chat_message("assistant"):
-        with st.spinner(T["spinner_agent"]):
-            try:
-                res = api_post("/query/ask", {"question": prompt})
-                answer = res["answer"]
-                st.markdown(answer)
-                st.caption(T["action_label"].format(
-                    res["action_taken"], res["iterations"],
-                    res.get("critique", {}).get("score", "?")
-                ))
-                if res.get("sources"):
-                    with st.expander(T["sources_label"].format(len(res["sources"]))):
-                        for i, src in enumerate(res["sources"], 1):
-                            st.markdown(
-                                f"**[{i}]** `{src.get('source', 'unknown')}` "
-                                f"(score: {src.get('score', 0):.3f})"
-                            )
-                            st.text(str(src.get("text", ""))[:500] + "...")
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "content": answer,
-                    "sources": res.get("sources", []),
-                })
-            except Exception as e:
-                st.error(T["error_prefix"].format(e))
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+            if "sources" in msg and msg["sources"]:
+                with st.expander(T["sources_label"].format(len(msg["sources"]))):
+                    for i, src in enumerate(msg["sources"], 1):
+                        st.markdown(
+                            f"**[{i}]** `{src.get('source', 'unknown')}` "
+                            f"(score: {src.get('score', 0):.3f})"
+                        )
+                        st.text(str(src.get("text", ""))[:500] + "...")
+
+    if prompt := st.chat_input(T["chat_placeholder"]):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        with st.chat_message("assistant"):
+            # Show skeleton while waiting
+            skeleton_slot = st.empty()
+            skeleton_slot.markdown("""
+<div class="skeleton" style="width:80%"></div>
+<div class="skeleton" style="width:60%"></div>
+<div class="skeleton" style="width:70%"></div>
+""", unsafe_allow_html=True)
+
+            with st.spinner(T["spinner_agent"]):
+                try:
+                    res = api_post("/query/ask", {"question": prompt})
+                    answer = res["answer"]
+                    skeleton_slot.empty()
+                    st.markdown(answer)
+                    st.caption(T["action_label"].format(
+                        res["action_taken"], res["iterations"],
+                        res.get("critique", {}).get("score", "?")
+                    ))
+                    if res.get("sources"):
+                        with st.expander(T["sources_label"].format(len(res["sources"]))):
+                            for i, src in enumerate(res["sources"], 1):
+                                st.markdown(
+                                    f"**[{i}]** `{src.get('source', 'unknown')}` "
+                                    f"(score: {src.get('score', 0):.3f})"
+                                )
+                                st.text(str(src.get("text", ""))[:500] + "...")
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": answer,
+                        "sources": res.get("sources", []),
+                    })
+                except Exception as e:
+                    skeleton_slot.empty()
+                    st.error(T["error_prefix"].format(e))
+
+
+chat_content()
