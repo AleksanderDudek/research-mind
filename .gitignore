@@ -9,6 +9,7 @@ env/
 # Środowisko
 .env
 *.env.local
+.env.cloud
 
 # IDE
 .vscode/
