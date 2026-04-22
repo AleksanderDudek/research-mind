@@ -4,11 +4,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    # Qdrant — set qdrant_local_path to use embedded mode (no server needed)
+    # Qdrant
+    # - local embedded:  set qdrant_local_path (e.g. "./qdrant_db")
+    # - self-hosted:     set qdrant_host + qdrant_port
+    # - Qdrant Cloud:    set qdrant_host (cluster URL) + qdrant_api_key
     qdrant_host: str = "qdrant"
     qdrant_port: int = 6333
     qdrant_collection: str = "research_papers"
-    qdrant_local_path: str = ""  # e.g. "./qdrant_db" for local embedded mode
+    qdrant_local_path: str = ""
+    qdrant_api_key: str = ""
 
     # LiteLLM
     litellm_base_url: str = "http://litellm:4000"

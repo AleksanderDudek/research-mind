@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: litellm-config
+  namespace: researchmind
+data:
+  config.yaml: |
+    model_list:
+      - model_name: groq-llama
+        litellm_params:
+          model: groq/llama-3.1-8b-instant
+          api_key: os.environ/LITELLM_API_KEY
+
+      - model_name: groq-llama-large
+        litellm_params:
+          model: groq/llama-3.3-70b-versatile
+          api_key: os.environ/LITELLM_API_KEY
+
+    general_settings:
+      master_key: sk-researchmind-local
+
+    litellm_settings:
+      drop_params: true
+      set_verbose: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: litellm
+  namespace: researchmind
+spec:
+  selector:
+    app: litellm
+  ports:
+    - port: 4000
+      targetPort: 4000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litellm
+  namespace: researchmind
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: litellm
+  template:
+    metadata:
+      labels:
+        app: litellm
+    spec:
+      containers:
+        - name: litellm
+          image: ghcr.io/berriai/litellm:main-latest
+          command: ["litellm", "--config", "/app/config.yaml", "--port", "4000"]
+          ports:
+            - containerPort: 4000
+          envFrom:
+            - secretRef:
+                name: researchmind-secrets
+          volumeMounts:
+            - name: config
+              mountPath: /app/config.yaml
+              subPath: config.yaml
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 4000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+      volumes:
+        - name: config
+          configMap:
+            name: litellm-config

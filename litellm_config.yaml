@@ -9,7 +9,25 @@ model_list:
       model: ollama/qwen2.5:3b
       api_base: http://ollama:11434
 
-  # Odkomentuj aby używać OpenAI / Anthropic:
+  # Groq (free tier — cloud deployment)
+  - model_name: groq-llama
+    litellm_params:
+      model: groq/llama-3.1-8b-instant
+      api_key: os.environ/GROQ_API_KEY
+
+  - model_name: groq-llama-large
+    litellm_params:
+      model: groq/llama-3.3-70b-versatile
+      api_key: os.environ/GROQ_API_KEY
+
+  # vLLM (GPU — Phase 6, requires docker-compose.gpu.yml)
+  # - model_name: vllm-qwen
+  #   litellm_params:
+  #     model: openai/Qwen/Qwen2.5-7B-Instruct
+  #     api_base: http://vllm:8000/v1
+  #     api_key: dummy
+
+  # OpenAI / Anthropic (optional)
   # - model_name: gpt-4o-mini
   #   litellm_params:
   #     model: openai/gpt-4o-mini

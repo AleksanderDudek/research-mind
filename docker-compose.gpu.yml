@@ -1,0 +1,71 @@
+# GPU override — use with:
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+#
+# Requirements:
+#   - NVIDIA GPU with CUDA 12+
+#   - nvidia-container-toolkit installed
+#   - At least 16 GB VRAM for Qwen2.5-7B-Instruct
+#
+# Replaces: ollama + litellm → vLLM serving Qwen2.5-7B
+# Model is downloaded from HuggingFace on first start (~15 GB)
+
+services:
+  ollama:
+    profiles: [disabled]
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    restart: unless-stopped
+    ports:
+      - "11434:4000"
+    volumes:
+      - ./litellm_config.yaml:/app/config.yaml:ro
+    environment:
+      LITELLM_MASTER_KEY: sk-researchmind-local
+    command: --config /app/config.yaml --port 4000 --num_workers 1
+    depends_on:
+      - vllm
+    networks:
+      - researchmind
+
+  vllm:
+    image: vllm/vllm-openai:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8000"
+    volumes:
+      - vllm_cache:/root/.cache/huggingface
+    environment:
+      HUGGING_FACE_HUB_TOKEN: ${HUGGING_FACE_HUB_TOKEN:-}
+    command: >
+      --model Qwen/Qwen2.5-7B-Instruct
+      --dtype bfloat16
+      --max-model-len 8192
+      --gpu-memory-utilization 0.90
+      --served-model-name vllm-qwen
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+    networks:
+      - researchmind
+
+  backend:
+    environment:
+      LITELLM_BASE_URL: http://litellm:4000
+      LLM_MODEL: vllm-qwen
+    depends_on:
+      vllm:
+        condition: service_healthy
+
+volumes:
+  vllm_cache:

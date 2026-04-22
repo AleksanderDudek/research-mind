@@ -13,7 +13,14 @@ class VectorStore:
             if settings.qdrant_local_path:
                 # Embedded mode — no server required, data persisted to disk
                 cls._instance.client = QdrantClient(path=settings.qdrant_local_path)
+            elif settings.qdrant_api_key:
+                # Qdrant Cloud — managed cluster with API key auth
+                cls._instance.client = QdrantClient(
+                    url=f"https://{settings.qdrant_host}",
+                    api_key=settings.qdrant_api_key,
+                )
             else:
+                # Self-hosted server
                 cls._instance.client = QdrantClient(
                     host=settings.qdrant_host,
                     port=settings.qdrant_port,
