@@ -79,7 +79,18 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
     },
 }
 
-# ── Browser language detection ─────────────────────────────────────────────────
+# ── Resolve language (pure dict read — no Streamlit rendering) ────────────────
+
+lang = st.query_params.get("lang", "en")
+if lang not in TRANSLATIONS:
+    lang = "en"
+T = TRANSLATIONS[lang]
+
+# ── Page config — must be the first Streamlit command ─────────────────────────
+
+st.set_page_config(page_title=T["page_title"], page_icon="📚", layout="wide")
+
+# ── Browser language detection (redirect if ?lang not yet in URL) ─────────────
 
 components.html("""
 <script>
@@ -91,17 +102,6 @@ components.html("""
     }
 </script>
 """, height=0)
-
-# ── Resolve language ───────────────────────────────────────────────────────────
-
-lang = st.query_params.get("lang", "en")
-if lang not in TRANSLATIONS:
-    lang = "en"
-T = TRANSLATIONS[lang]
-
-# ── Page config ────────────────────────────────────────────────────────────────
-
-st.set_page_config(page_title=T["page_title"], page_icon="📚", layout="wide")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
