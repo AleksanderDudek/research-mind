@@ -7,23 +7,17 @@ import uuid
 from datetime import datetime, timezone
 
 from loguru import logger
-from qdrant_client import QdrantClient, models
+from qdrant_client import models
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
 from app.config import settings
+from app.services._qdrant import get_client
 
 _DUMMY_VEC = [0.0]
 
 
-def _client() -> QdrantClient:
-    if settings.qdrant_local_path:
-        return QdrantClient(path=settings.qdrant_local_path)
-    if settings.qdrant_api_key:
-        return QdrantClient(url=f"https://{settings.qdrant_host}", api_key=settings.qdrant_api_key)
-    return QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
-
-
-def _ensure_collection(client: QdrantClient) -> None:
+def _ensure_collection() -> None:
+    client = get_client()
     names = [c.name for c in client.get_collections().collections]
     if settings.qdrant_sources_collection not in names:
         logger.info(f"Creating collection: {settings.qdrant_sources_collection}")
@@ -50,8 +44,8 @@ def save_source(
     url: str | None,
     chunk_count: int,
 ) -> dict:
-    client = _client()
-    _ensure_collection(client)
+    client = get_client()
+    _ensure_collection()
     record_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, document_id))
     payload = {
         "context_id": context_id,
@@ -71,8 +65,8 @@ def save_source(
 
 
 def list_sources(context_id: str) -> list[dict]:
-    client = _client()
-    _ensure_collection(client)
+    client = get_client()
+    _ensure_collection()
     results, _ = client.scroll(
         collection_name=settings.qdrant_sources_collection,
         scroll_filter=models.Filter(
@@ -88,8 +82,8 @@ def list_sources(context_id: str) -> list[dict]:
 
 
 def get_source(context_id: str, document_id: str) -> dict | None:
-    client = _client()
-    _ensure_collection(client)
+    client = get_client()
+    _ensure_collection()
     results, _ = client.scroll(
         collection_name=settings.qdrant_sources_collection,
         scroll_filter=models.Filter(must=[
@@ -103,9 +97,9 @@ def get_source(context_id: str, document_id: str) -> dict | None:
     return results[0].payload if results else None
 
 
-def delete_source(context_id: str, document_id: str) -> bool:
-    client = _client()
-    _ensure_collection(client)
+def delete_source(document_id: str) -> bool:
+    client = get_client()
+    _ensure_collection()
     record_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, document_id))
     client.delete(
         collection_name=settings.qdrant_sources_collection,
@@ -115,8 +109,8 @@ def delete_source(context_id: str, document_id: str) -> bool:
 
 
 def delete_sources_for_context(context_id: str) -> None:
-    client = _client()
-    _ensure_collection(client)
+    client = get_client()
+    _ensure_collection()
     client.delete(
         collection_name=settings.qdrant_sources_collection,
         points_selector=models.FilterSelector(

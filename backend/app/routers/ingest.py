@@ -58,7 +58,7 @@ async def ingest_pdf_upload(
         raise HTTPException(status_code=400, detail="Plik musi mieć rozszerzenie .pdf")
     try:
         pdf_bytes = await file.read()
-        return await service.ingest_pdf_bytes(pdf_bytes, source=file.filename, context_id=context_id)
+        return service.ingest_pdf_bytes(pdf_bytes, source=file.filename, context_id=context_id)
     except Exception as e:
         logger.exception("PDF upload ingestion failed")
         raise HTTPException(status_code=400, detail=str(e))
@@ -70,7 +70,7 @@ async def ingest_raw_text(req: TextRequest, service: ServiceDep) -> dict:
     if len(req.text.strip()) < 50:
         raise HTTPException(status_code=400, detail="Tekst za krótki (min. 50 znaków).")
     try:
-        return await service.ingest_raw_text(req.text, req.title, req.context_id)
+        return service.ingest_raw_text(req.text, req.title, req.context_id)
     except Exception as e:
         logger.exception("Raw text ingestion failed")
         raise HTTPException(status_code=400, detail=str(e))

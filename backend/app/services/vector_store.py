@@ -1,7 +1,8 @@
-from qdrant_client import QdrantClient, models
+from qdrant_client import models
 from qdrant_client.models import Distance, VectorParams, PointStruct
 from loguru import logger
 from app.config import settings
+from app.services._qdrant import get_client
 
 
 class VectorStore:
@@ -10,18 +11,7 @@ class VectorStore:
     def __new__(cls) -> "VectorStore":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            if settings.qdrant_local_path:
-                cls._instance.client = QdrantClient(path=settings.qdrant_local_path)
-            elif settings.qdrant_api_key:
-                cls._instance.client = QdrantClient(
-                    url=f"https://{settings.qdrant_host}",
-                    api_key=settings.qdrant_api_key,
-                )
-            else:
-                cls._instance.client = QdrantClient(
-                    host=settings.qdrant_host,
-                    port=settings.qdrant_port,
-                )
+            cls._instance.client = get_client()
             cls._instance.collection = settings.qdrant_collection
             cls._instance._ensure_collection()
         return cls._instance
