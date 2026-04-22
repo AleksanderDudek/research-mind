@@ -40,9 +40,10 @@ spec:
       labels:
         app: backend
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: backend
-          image: ghcr.io/OWNER/researchmind-backend:latest
+          image: ghcr.io/aleksanderdudek/researchmind-backend:latest
           ports:
             - containerPort: 8000
           envFrom:
@@ -69,10 +70,10 @@ spec:
               port: 8000
             initialDelaySeconds: 60
             periodSeconds: 30
-          # HuggingFace model cache — avoids re-download on pod restart
           volumeMounts:
             - name: hf-cache
               mountPath: /root/.cache/huggingface
       volumes:
         - name: hf-cache
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: "2Gi"

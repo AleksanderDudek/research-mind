@@ -33,9 +33,10 @@ spec:
       labels:
         app: frontend
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: frontend
-          image: ghcr.io/OWNER/researchmind-frontend:latest
+          image: ghcr.io/aleksanderdudek/researchmind-frontend:latest
           ports:
             - containerPort: 8501
           envFrom:
@@ -45,6 +46,7 @@ spec:
             requests:
               memory: "128Mi"
               cpu: "100m"
+              ephemeral-storage: "256Mi"
             limits:
               memory: "512Mi"
               cpu: "500m"
