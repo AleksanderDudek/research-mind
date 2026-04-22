@@ -6,11 +6,13 @@ import streamlit.components.v1 as components
 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8001")
 
+# Must be the absolute first Streamlit command — values are language-independent
+st.set_page_config(page_title="ResearchMind", page_icon="📚", layout="wide")
+
 # ── i18n ───────────────────────────────────────────────────────────────────────
 
 TRANSLATIONS: dict[str, dict[str, str]] = {
     "pl": {
-        "page_title": "ResearchMind",
         "app_title": "📚 ResearchMind",
         "app_caption": "Analiza badań naukowych z agentem AI",
         "sidebar_title": "📥 Dodaj źródło",
@@ -44,7 +46,6 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "lang_toggle_target": "en",
     },
     "en": {
-        "page_title": "ResearchMind",
         "app_title": "📚 ResearchMind",
         "app_caption": "Scientific research analysis with AI agent",
         "sidebar_title": "📥 Add source",
@@ -85,10 +86,6 @@ lang = st.query_params.get("lang", "en")
 if lang not in TRANSLATIONS:
     lang = "en"
 T = TRANSLATIONS[lang]
-
-# ── Page config — must be the first Streamlit command ─────────────────────────
-
-st.set_page_config(page_title=T["page_title"], page_icon="📚", layout="wide")
 
 # ── Browser language detection (redirect if ?lang not yet in URL) ─────────────
 
