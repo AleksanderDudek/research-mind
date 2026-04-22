@@ -34,17 +34,19 @@ class SearchRequest(BaseModel):
     question: str
     top_k: int = 5
     source_type: str | None = None
+    context_id: str | None = None
 
 
 class AskRequest(BaseModel):
     question: str
+    context_id: str | None = None
 
 
 @router.get("/documents", responses=_500)
-async def list_documents(store: StoreDep) -> dict:
+async def list_documents(store: StoreDep, context_id: str | None = None) -> dict:
     """Lista wszystkich zaindeksowanych dokumentów."""
     try:
-        docs = store.list_documents()
+        docs = store.list_documents(context_id=context_id)
         return {"count": len(docs), "documents": docs}
     except Exception as e:
         logger.exception("list_documents failed")
@@ -56,8 +58,12 @@ async def semantic_search(req: SearchRequest, embedder: EmbedderDep, store: Stor
     """Wyszukiwanie semantyczne bez LLM (tylko retrieval)."""
     try:
         vec = embedder.embed_one(req.question)
-        filters = {"source_type": req.source_type} if req.source_type else None
-        hits = store.search(vec, top_k=req.top_k, filters=filters)
+        filters: dict[str, str] = {}
+        if req.source_type:
+            filters["source_type"] = req.source_type
+        if req.context_id:
+            filters["context_id"] = req.context_id
+        hits = store.search(vec, top_k=req.top_k, filters=filters or None)
         return {
             "question": req.question,
             "results": [
@@ -79,7 +85,7 @@ async def semantic_search(req: SearchRequest, embedder: EmbedderDep, store: Stor
 async def ask_agent(req: AskRequest, agent: AgentDep) -> dict:
     """Zapytanie do agenta LangGraph z pełnym workflow."""
     try:
-        result = await agent.run(req.question)
+        result = await agent.run(req.question, context_id=req.context_id)
         return result
     except Exception as e:
         logger.exception("Agent failed")

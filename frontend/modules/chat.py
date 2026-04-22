@@ -28,7 +28,7 @@ def _render_history(T: dict[str, str]) -> None:
 
 
 @st.fragment
-def chat_content(T: dict[str, str]) -> None:
+def chat_content(T: dict[str, str], context_id: str | None = None) -> None:
     st.title(T["app_title"])
     st.caption(T["app_caption"])
 
@@ -45,7 +45,7 @@ def chat_content(T: dict[str, str]) -> None:
 
             with st.spinner(T["spinner_agent"]):
                 try:
-                    res = api_post("/query/ask", {"question": prompt})
+                    res = api_post("/query/ask", {"question": prompt, "context_id": context_id})
                     answer = res["answer"]
                     skeleton.empty()
                     st.markdown(answer)

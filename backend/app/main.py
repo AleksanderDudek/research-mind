@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-from app.routers import ingest, query
+from app.routers import ingest, query, contexts
 
 
 @asynccontextmanager
@@ -31,6 +31,7 @@ app.add_middleware(
 
 app.include_router(ingest.router)
 app.include_router(query.router)
+app.include_router(contexts.router)
 
 
 @app.get("/health")

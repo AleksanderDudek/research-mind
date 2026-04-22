@@ -23,7 +23,7 @@ def _ingest_with_status(T: dict[str, str], fn, *args, **kwargs) -> None:
 
 
 @st.fragment
-def sidebar_content(T: dict[str, str], lang: str) -> None:
+def sidebar_content(T: dict[str, str], lang: str, context_id: str | None = None) -> None:
     st.markdown(
         f'<a href="?lang={T["lang_toggle_target"]}" target="_self">{T["lang_toggle"]}</a>',
         unsafe_allow_html=True,
@@ -38,17 +38,20 @@ def sidebar_content(T: dict[str, str], lang: str) -> None:
     with tab_pdf_url:
         pdf_url = st.text_input(T["label_pdf_url"], placeholder=T["ph_pdf_url"], key="in_pdf_url")
         if st.button(T["btn_pdf_url"], key="pdf_url_btn") and pdf_url:
-            _ingest_with_status(T, api_post, "/ingest/pdf-url", {"url": pdf_url})
+            _ingest_with_status(T, api_post, "/ingest/pdf-url", {"url": pdf_url, "context_id": context_id})
 
     with tab_web:
         web_url = st.text_input(T["label_web_url"], placeholder=T["ph_web_url"], key="in_web_url")
         if st.button(T["btn_web_url"], key="web_url_btn") and web_url:
-            _ingest_with_status(T, api_post, "/ingest/web-url", {"url": web_url})
+            _ingest_with_status(T, api_post, "/ingest/web-url", {"url": web_url, "context_id": context_id})
 
     with tab_upload:
         uploaded = st.file_uploader(T["label_upload"], type=["pdf"], key="in_upload")
         if uploaded and st.button(T["btn_upload"], key="upload_btn"):
-            files = {"file": (uploaded.name, uploaded.getvalue(), "application/pdf")}
+            files = {
+                "file": (uploaded.name, uploaded.getvalue(), "application/pdf"),
+                "context_id": (None, context_id or ""),
+            }
             _ingest_with_status(T, api_post, "/ingest/pdf-upload", files=files)
 
     with tab_text:
@@ -58,7 +61,7 @@ def sidebar_content(T: dict[str, str], lang: str) -> None:
             if len(pasted_text.strip()) >= 50:
                 _ingest_with_status(
                     T, api_post, "/ingest/raw-text",
-                    {"text": pasted_text, "title": text_title},
+                    {"text": pasted_text, "title": text_title, "context_id": context_id},
                 )
             else:
                 st.warning(T["warn_too_short"])

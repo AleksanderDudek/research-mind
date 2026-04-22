@@ -1,9 +1,9 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-from modules.chat import chat_content
+from modules.context_panel import context_panel
+from modules.context_view import context_view
 from modules.i18n import get_lang, get_T
-from modules.sidebar import sidebar_content
 from modules.styles import inject_styles
 
 # Must be the absolute first Streamlit command
@@ -31,13 +31,16 @@ components.html("""
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+if "active_context" not in st.session_state:
+    st.session_state.active_context = None
+
 # ── Styles ─────────────────────────────────────────────────────────────────────
 
 inject_styles()
 
 # ── Layout ─────────────────────────────────────────────────────────────────────
 
-with st.sidebar:
-    sidebar_content(T, lang)
-
-chat_content(T)
+if st.session_state.active_context is None:
+    context_panel(T)
+else:
+    context_view(T, lang, st.session_state.active_context)

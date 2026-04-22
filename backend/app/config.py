@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     qdrant_host: str = "qdrant"
     qdrant_port: int = 6333
     qdrant_collection: str = "research_papers"
+    qdrant_contexts_collection: str = "rm_contexts"
+    qdrant_sources_collection: str = "rm_sources"
+    qdrant_history_collection: str = "rm_history"
     qdrant_local_path: str = ""
     qdrant_api_key: str = ""
 
