@@ -27,12 +27,13 @@ class VectorStore:
                     distance=Distance.COSINE,
                 ),
             )
-            for field in ("source_type", "document_id", "context_id"):
-                self.client.create_payload_index(
-                    collection_name=self.collection,
-                    field_name=field,
-                    field_schema=models.PayloadSchemaType.KEYWORD,
-                )
+        # Ensure indexes exist on every startup — collection may predate context_id.
+        for field in ("source_type", "document_id", "context_id"):
+            self.client.create_payload_index(
+                collection_name=self.collection,
+                field_name=field,
+                field_schema=models.PayloadSchemaType.KEYWORD,
+            )
 
     def list_documents(self, context_id: str | None = None) -> list[dict]:
         seen: set[str] = set()
