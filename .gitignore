@@ -20,6 +20,7 @@ env/
 data/
 models/
 qdrant_storage/
+qdrant_db/
 ollama_models/
 langfuse_db/
 
