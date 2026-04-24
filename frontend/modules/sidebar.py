@@ -3,7 +3,7 @@ import streamlit as st
 from .api_client import api_get, api_post, api_post_audio, api_put, api_patch, api_delete
 
 
-# ── Dialogs (module-level required by Streamlit) ────────────────────────────────
+# ── Dialogs ──────────────────────────────────────────────────────────────────────
 
 @st.dialog("Rename context")
 def _rename_dialog(ctx_id: str, current_name: str, t: dict) -> None:
@@ -52,7 +52,7 @@ def _edit_source_dialog(ctx_id: str, doc_id: str, t: dict) -> None:
             st.rerun()
 
 
-# ── Helpers ─────────────────────────────────────────────────────────────────────
+# ── Shared helpers ───────────────────────────────────────────────────────────────
 
 def _lang_toggle(t: dict) -> None:
     st.markdown(
@@ -159,16 +159,7 @@ def _tab_audio(t: dict, ctx_id: str, n: int) -> None:
             st.rerun()
 
 
-# ── Panel sidebar (context list screen) ────────────────────────────────────────
-
-def panel_sidebar(t: dict) -> None:
-    _lang_toggle(t)
-    st.divider()
-    st.markdown("#### 📚 ResearchMind")
-    st.caption(t["app_caption"])
-
-
-# ── Context sidebar ──────────────────────────────────────────────────────────────
+# ── Sources & History accordions ─────────────────────────────────────────────────
 
 _HISTORY_ICONS: dict[str, str] = {"source_added": "➕", "source_edited": "✏️"}
 
@@ -187,12 +178,10 @@ def _sources_accordion(t: dict, ctx_id: str) -> None:
             doc_id = src.get("document_id", "")
             title = src.get("title") or doc_id[:8]
             s_type = src.get("source_type", "")
-            chunks = src.get("chunk_count", 0)
-            date = src.get("ingested_at", "")[:10]
             col_info, col_edit_btn, col_del_btn = st.columns([5, 1, 1])
             with col_info:
                 st.markdown(f"**{title}**")
-                st.caption(f"{s_type} · {chunks} {t['ctx_chunks']} · {date}")
+                st.caption(s_type)
             with col_edit_btn:
                 if st.button("✏️", key=f"src_edit_{doc_id}", help=t["ctx_edit_source"]):
                     _edit_source_dialog(ctx_id, doc_id, t)
@@ -220,57 +209,3 @@ def _history_accordion(t: dict, ctx_id: str) -> None:
             detail = entry.get("detail", "")
             icon = _HISTORY_ICONS.get(action, "•")
             st.markdown(f"{icon} `{ts}` {detail}")
-
-
-def context_sidebar(t: dict, ctx: dict) -> None:
-    ctx_id = ctx["context_id"]
-
-    # ── Navigation row ──────────────────────────────────────────────────────────
-    col_back, col_lang = st.columns([3, 1])
-    with col_back:
-        if st.button(t["ctx_back"], use_container_width=True):
-            st.session_state.active_context = None
-            st.session_state.messages = []
-            st.session_state.pop("editing_context_name", None)
-            st.rerun()
-    with col_lang:
-        _lang_toggle(t)
-
-    st.divider()
-
-    # ── Context name + rename ───────────────────────────────────────────────────
-    col_name, col_edit = st.columns([5, 1])
-    with col_name:
-        st.markdown(f"**{ctx['name']}**")
-    with col_edit:
-        if st.button("✏️", key="btn_rename_ctx", help=t["ctx_rename"]):
-            _rename_dialog(ctx_id, ctx["name"], t)
-
-    st.divider()
-
-    # ── Ingest success banner ───────────────────────────────────────────────────
-    if msg := st.session_state.pop("_ingest_ok", None):
-        st.success(msg)
-
-    # ── Add Source accordion ────────────────────────────────────────────────────
-    with st.expander(t["ctx_add_source"], expanded=True):
-        n = st.session_state.get("_ingest_n", 0)
-        tab_pdf_url, tab_web, tab_upload, tab_text, tab_image, tab_audio = st.tabs([
-            t["tab_pdf_url"], t["tab_web"], t["tab_upload"], t["tab_text"], t["tab_image"], t["tab_audio"],
-        ])
-        with tab_pdf_url:
-            _tab_pdf_url(t, ctx_id, n)
-        with tab_web:
-            _tab_web(t, ctx_id, n)
-        with tab_upload:
-            _tab_upload(t, ctx_id, n)
-        with tab_text:
-            _tab_text(t, ctx_id, n)
-        with tab_image:
-            _tab_image(t, ctx_id, n)
-        with tab_audio:
-            _tab_audio(t, ctx_id, n)
-
-    # ── Sources + History accordions ────────────────────────────────────────────
-    _sources_accordion(t, ctx_id)
-    _history_accordion(t, ctx_id)

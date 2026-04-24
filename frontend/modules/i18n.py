@@ -74,6 +74,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "btn_audio": "Transkrybuj i zindeksuj",
         "audio_hint": "Transkrypcja może potrwać kilka minut dla długich nagrań.",
         "text_default_title": "Wklejony tekst",
+        "pending_banner": "Twoje pytanie czeka na odpowiedź",
+        "pending_resume": "Wznów →",
+        "pending_dismiss": "Odrzuć",
     },
     "en": {
         "app_title": "📚 ResearchMind",
@@ -148,6 +151,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "btn_audio": "Transcribe and index",
         "audio_hint": "Transcription may take a few minutes for long recordings.",
         "text_default_title": "Manual paste",
+        "pending_banner": "Your question is waiting for an answer",
+        "pending_resume": "Resume →",
+        "pending_dismiss": "Dismiss",
     },
 }
 

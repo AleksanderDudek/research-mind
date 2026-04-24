@@ -11,10 +11,11 @@ _SKELETON_HTML = """
 """
 
 _VISIBLE_PAIRS = 10
+_PENDING_KEY = "_pending_question"
 
 
-def _render_sources(T: dict[str, str], sources: list[dict]) -> None:
-    with st.expander(T["sources_label"].format(len(sources))):
+def _render_sources(t: dict[str, str], sources: list[dict]) -> None:
+    with st.expander(t["sources_label"].format(len(sources))):
         for i, src in enumerate(sources, 1):
             st.markdown(
                 f"**[{i}]** `{src.get('source', 'unknown')}` "
@@ -30,25 +31,26 @@ def _render_sources(T: dict[str, str], sources: list[dict]) -> None:
                 st.text(str(src.get("text", ""))[:500] + "...")
 
 
-def _render_pair(T: dict[str, str], user_msg: dict, asst_msg: dict, show_sources: bool) -> None:
+def _render_pair(t: dict[str, str], user_msg: dict, asst_msg: dict, show_sources: bool) -> None:
     with st.chat_message("user"):
         st.markdown(user_msg["content"])
     with st.chat_message("assistant"):
         st.markdown(asst_msg["content"])
-        st.caption(T["action_label"].format(
-            asst_msg.get("action_taken", "—"),
-            asst_msg.get("iterations", "—"),
-            (asst_msg.get("critique") or {}).get("score", "?"),
-        ))
-        if show_sources and asst_msg.get("sources"):
-            _render_sources(T, asst_msg["sources"])
-        elif not show_sources:
-            n = len(asst_msg.get("sources") or [])
-            if n:
-                st.caption(f"📎 {T['sources_label'].format(n)}")
+        sources = asst_msg.get("sources") or []
+        if show_sources and sources:
+            _render_sources(t, sources)
+        elif sources:
+            st.caption(f"📚 {t['sources_label'].format(len(sources))}")
+        # Technical metadata tucked away for power users
+        action = asst_msg.get("action_taken")
+        iterations = asst_msg.get("iterations")
+        critique = (asst_msg.get("critique") or {}).get("score")
+        if action or iterations:
+            with st.expander("Details", expanded=False):
+                st.caption(t["action_label"].format(action or "—", iterations or "—", critique or "?"))
 
 
-def _render_history(T: dict[str, str]) -> None:
+def _render_history(t: dict[str, str]) -> None:
     msgs = st.session_state.messages
     if not msgs:
         return
@@ -66,16 +68,15 @@ def _render_history(T: dict[str, str]) -> None:
     recent = pairs[-_VISIBLE_PAIRS:] if len(pairs) > _VISIBLE_PAIRS else pairs
 
     if older:
-        with st.expander(T["chat_earlier"].format(len(older)), expanded=False):
+        with st.expander(t["chat_earlier"].format(len(older)), expanded=False):
             for user_msg, asst_msg in older:
-                _render_pair(T, user_msg, asst_msg, show_sources=False)
+                _render_pair(t, user_msg, asst_msg, show_sources=False)
 
     for user_msg, asst_msg in recent:
-        _render_pair(T, user_msg, asst_msg, show_sources=True)
+        _render_pair(t, user_msg, asst_msg, show_sources=True)
 
 
 def _load_messages(context_id: str) -> None:
-    """Fetch persisted messages from backend when entering a context."""
     if st.session_state.get("_chat_ctx") == context_id:
         return
     try:
@@ -86,7 +87,6 @@ def _load_messages(context_id: str) -> None:
 
 
 def _persist_message(context_id: str, msg: dict) -> None:
-    """Save one message to the backend; silently ignore failures."""
     try:
         api_post(f"/contexts/{context_id}/messages", {
             "role": msg["role"],
@@ -100,51 +100,74 @@ def _persist_message(context_id: str, msg: dict) -> None:
         pass
 
 
-def chat_content(T: dict[str, str], context_id: str | None = None) -> None:
+def _run_question(t: dict[str, str], context_id: str | None, prompt: str) -> None:
+    user_msg: dict = {"role": "user", "content": prompt}
+    st.session_state.messages.append(user_msg)
+
+    # Save pending state BEFORE the blocking call so navigation away is recoverable
+    if context_id:
+        st.session_state[_PENDING_KEY] = {"question": prompt, "context_id": context_id}
+
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
+        skeleton = st.empty()
+        skeleton.markdown(_SKELETON_HTML, unsafe_allow_html=True)
+
+        with st.spinner(t["spinner_agent"]):
+            try:
+                res = api_post("/query/ask", {"question": prompt, "context_id": context_id})
+                st.session_state.pop(_PENDING_KEY, None)
+                answer = res["answer"]
+                skeleton.empty()
+                st.markdown(answer)
+                sources = res.get("sources", [])
+                if sources:
+                    _render_sources(t, sources)
+                asst_msg: dict = {
+                    "role": "assistant",
+                    "content": answer,
+                    "sources": sources,
+                    "action_taken": res["action_taken"],
+                    "iterations": res["iterations"],
+                    "critique": res.get("critique"),
+                }
+                st.session_state.messages.append(asst_msg)
+                if context_id:
+                    _persist_message(context_id, user_msg)
+                    _persist_message(context_id, asst_msg)
+            except Exception as e:
+                st.session_state.pop(_PENDING_KEY, None)
+                skeleton.empty()
+                st.error(t["error_prefix"].format(e))
+
+
+def _check_pending(t: dict[str, str], context_id: str | None) -> None:
+    pending = st.session_state.get(_PENDING_KEY)
+    if not pending:
+        return
+    if context_id and pending.get("context_id") != context_id:
+        return
+
+    st.warning(f"**{t['pending_banner']}**  \n> {pending['question']}")
+    col_resume, col_dismiss = st.columns([1, 1])
+    with col_resume:
+        if st.button(t["pending_resume"], type="primary", use_container_width=True):
+            st.session_state.pop(_PENDING_KEY)
+            _run_question(t, context_id, pending["question"])
+    with col_dismiss:
+        if st.button(t["pending_dismiss"], use_container_width=True):
+            st.session_state.pop(_PENDING_KEY)
+            st.rerun()
+
+
+def chat_content(t: dict[str, str], context_id: str | None = None) -> None:
     if context_id:
         _load_messages(context_id)
 
-    st.title(T["app_title"])
-    st.caption(T["app_caption"])
+    _check_pending(t, context_id)
+    _render_history(t)
 
-    _render_history(T)
-
-    if prompt := st.chat_input(T["chat_placeholder"]):
-        user_msg: dict = {"role": "user", "content": prompt}
-        st.session_state.messages.append(user_msg)
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        with st.chat_message("assistant"):
-            skeleton = st.empty()
-            skeleton.markdown(_SKELETON_HTML, unsafe_allow_html=True)
-
-            with st.spinner(T["spinner_agent"]):
-                try:
-                    res = api_post("/query/ask", {"question": prompt, "context_id": context_id})
-                    answer = res["answer"]
-                    skeleton.empty()
-                    st.markdown(answer)
-                    st.caption(T["action_label"].format(
-                        res["action_taken"],
-                        res["iterations"],
-                        res.get("critique", {}).get("score", "?"),
-                    ))
-                    sources = res.get("sources", [])
-                    if sources:
-                        _render_sources(T, sources)
-                    asst_msg: dict = {
-                        "role": "assistant",
-                        "content": answer,
-                        "sources": sources,
-                        "action_taken": res["action_taken"],
-                        "iterations": res["iterations"],
-                        "critique": res.get("critique"),
-                    }
-                    st.session_state.messages.append(asst_msg)
-                    if context_id:
-                        _persist_message(context_id, user_msg)
-                        _persist_message(context_id, asst_msg)
-                except Exception as e:
-                    skeleton.empty()
-                    st.error(T["error_prefix"].format(e))
+    if prompt := st.chat_input(t["chat_placeholder"]):
+        _run_question(t, context_id, prompt)
