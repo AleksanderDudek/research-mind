@@ -1,6 +1,7 @@
 import streamlit as st
 
 from .api_client import api_get, api_post, api_delete
+from .sidebar import _rename_dialog
 
 
 def context_panel(T: dict[str, str]) -> None:
@@ -22,11 +23,12 @@ def context_panel(T: dict[str, str]) -> None:
             except Exception as e:
                 st.error(T["error_prefix"].format(e))
 
-    try:
-        contexts = api_get("/contexts")
-    except Exception as e:
-        st.error(T["error_prefix"].format(e))
-        return
+    with st.spinner(T["ctx_loading"]):
+        try:
+            contexts = api_get("/contexts")
+        except Exception as e:
+            st.error(T["error_prefix"].format(e))
+            return
 
     if not contexts:
         st.info(T["ctx_no_contexts"])
@@ -35,11 +37,14 @@ def context_panel(T: dict[str, str]) -> None:
     contexts_sorted = sorted(contexts, key=lambda c: c.get("created_at", ""), reverse=True)
     for ctx in contexts_sorted:
         with st.container(border=True):
-            col_info, col_open, col_del = st.columns([5, 1, 1])
+            col_info, col_ren, col_open, col_del = st.columns([4, 1, 1, 1])
             with col_info:
                 st.markdown(f"**{ctx['name']}**")
                 created = ctx.get("created_at", "")[:10]
                 st.caption(created)
+            with col_ren:
+                if st.button("✏️", key=f"ren_{ctx['context_id']}", help=T["ctx_rename"]):
+                    _rename_dialog(ctx["context_id"], ctx["name"], T)
             with col_open:
                 if st.button(T["ctx_open"], key=f"open_{ctx['context_id']}", use_container_width=True):
                     st.session_state.active_context = ctx

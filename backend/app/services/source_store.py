@@ -43,11 +43,12 @@ def save_source(
     raw_text: str,
     url: str | None,
     chunk_count: int,
+    image_data: str | None = None,
+    image_mime_type: str | None = None,
 ) -> dict:
     client = get_client()
-    _ensure_collection()
     record_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, document_id))
-    payload = {
+    payload: dict = {
         "context_id": context_id,
         "document_id": document_id,
         "title": title,
@@ -57,6 +58,10 @@ def save_source(
         "chunk_count": chunk_count,
         "ingested_at": datetime.now(timezone.utc).isoformat(),
     }
+    if image_data:
+        payload["image_data"] = image_data
+    if image_mime_type:
+        payload["image_mime_type"] = image_mime_type
     client.upsert(
         collection_name=settings.qdrant_sources_collection,
         points=[PointStruct(id=record_id, vector=_DUMMY_VEC, payload=payload)],
@@ -66,7 +71,6 @@ def save_source(
 
 def list_sources(context_id: str) -> list[dict]:
     client = get_client()
-    _ensure_collection()
     results, _ = client.scroll(
         collection_name=settings.qdrant_sources_collection,
         scroll_filter=models.Filter(
@@ -83,7 +87,6 @@ def list_sources(context_id: str) -> list[dict]:
 
 def get_source(context_id: str, document_id: str) -> dict | None:
     client = get_client()
-    _ensure_collection()
     results, _ = client.scroll(
         collection_name=settings.qdrant_sources_collection,
         scroll_filter=models.Filter(must=[
@@ -99,7 +102,6 @@ def get_source(context_id: str, document_id: str) -> dict | None:
 
 def delete_source(document_id: str) -> bool:
     client = get_client()
-    _ensure_collection()
     record_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, document_id))
     client.delete(
         collection_name=settings.qdrant_sources_collection,
@@ -110,7 +112,6 @@ def delete_source(document_id: str) -> bool:
 
 def delete_sources_for_context(context_id: str) -> None:
     client = get_client()
-    _ensure_collection()
     client.delete(
         collection_name=settings.qdrant_sources_collection,
         points_selector=models.FilterSelector(

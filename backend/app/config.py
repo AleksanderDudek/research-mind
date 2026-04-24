@@ -14,6 +14,14 @@ class Settings(BaseSettings):
     qdrant_contexts_collection: str = "rm_contexts"
     qdrant_sources_collection: str = "rm_sources"
     qdrant_history_collection: str = "rm_history"
+    qdrant_chat_collection: str = "rm_chat"
+
+    # Vision
+    vision_model: str = "local-vision"
+
+    # Audio transcription (faster-whisper model size)
+    # Options: tiny, base, small, medium, large-v3
+    whisper_model: str = "base"
     qdrant_local_path: str = ""
     qdrant_api_key: str = ""
 
@@ -33,6 +41,9 @@ class Settings(BaseSettings):
     # Ingestion
     max_pdf_size_mb: int = 100
     request_timeout_sec: int = 60
+
+    # CORS (comma-separated origins; "*" allows all)
+    cors_origins: str = "*"
 
     # Langfuse (leave empty to disable tracing)
     langfuse_public_key: str = ""

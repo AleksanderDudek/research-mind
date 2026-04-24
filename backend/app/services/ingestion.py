@@ -1,10 +1,14 @@
+import base64
+import mimetypes
 import uuid
 from datetime import datetime, timezone
 
 from loguru import logger
 from qdrant_client.models import PointStruct
 
+from app.llm.client import LLMClient
 from app.services.chunker import Chunker
+from app.services.transcriber import Transcriber
 from app.services.embedder import Embedder
 from app.services.history_store import append as history_append
 from app.services.pdf_parser import PDFParser
@@ -22,6 +26,7 @@ class IngestionService:
         self.store = VectorStore()
         self.pdf_parser = PDFParser()
         self.scraper = WebScraper()
+        self.transcriber = Transcriber()
 
     def ingest_text(
         self,
@@ -118,6 +123,84 @@ class IngestionService:
             context_id=context_id,
             metadata={"source": "manual", "title": title},
         )
+
+    def ingest_audio_bytes(
+        self,
+        audio_bytes: bytes,
+        filename: str,
+        context_id: str,
+    ) -> dict:
+        logger.info(f"Transcribing audio {filename!r}")
+        transcription = self.transcriber.transcribe(audio_bytes, filename)
+        if not transcription.strip():
+            raise ValueError("Transcription produced no text — check audio quality.")
+        return self.ingest_text(
+            text=f"[Audio: {filename}]\n\n{transcription}",
+            source_type="audio",
+            context_id=context_id,
+            metadata={"title": filename, "source": filename},
+        )
+
+    async def ingest_image_bytes(
+        self,
+        image_bytes: bytes,
+        filename: str,
+        context_id: str,
+        detail_level: str = "standard",
+    ) -> dict:
+        mime_type, _ = mimetypes.guess_type(filename)
+        if not mime_type or not mime_type.startswith("image/"):
+            mime_type = "image/jpeg"
+
+        image_b64 = base64.b64encode(image_bytes).decode()
+
+        logger.info(f"Describing image {filename!r} detail_level={detail_level!r}")
+        description = await LLMClient.complete_vision(image_b64, mime_type, detail_level)
+
+        document_id = str(uuid.uuid4())
+        text = f"[Image: {filename}]\n\n{description}"
+        chunks = self.chunker.split(text) or [text]
+        vectors = self.embedder.embed(chunks)
+        now = datetime.now(timezone.utc).isoformat()
+
+        points = [
+            PointStruct(
+                id=str(uuid.uuid4()),
+                vector=vec,
+                payload={
+                    "text": chunk,
+                    "document_id": document_id,
+                    "context_id": context_id,
+                    "chunk_index": i,
+                    "source_type": "image",
+                    "title": filename,
+                    "source": filename,
+                    "ingested_at": now,
+                },
+            )
+            for i, (chunk, vec) in enumerate(zip(chunks, vectors))
+        ]
+        self.store.upsert(points)
+
+        save_source(
+            context_id=context_id,
+            document_id=document_id,
+            title=filename,
+            source_type="image",
+            raw_text=description,
+            url=None,
+            chunk_count=len(chunks),
+            image_data=image_b64,
+            image_mime_type=mime_type,
+        )
+        history_append(context_id=context_id, action="source_added", detail=f"image: {filename}")
+
+        return {
+            "document_id": document_id,
+            "chunks_ingested": len(chunks),
+            "source_type": "image",
+            "context_id": context_id,
+        }
 
     def reingest_text(
         self,

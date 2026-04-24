@@ -10,4 +10,7 @@ COPY modules/ ./modules/
 
 EXPOSE 8501
 
+RUN adduser --disabled-password --gecos '' appuser
+USER appuser
+
 CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]

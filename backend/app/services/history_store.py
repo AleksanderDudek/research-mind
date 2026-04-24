@@ -35,7 +35,6 @@ def _ensure_collection() -> None:
 
 def append(context_id: str, action: str, detail: str) -> dict:
     client = get_client()
-    _ensure_collection()
     entry_id = str(uuid.uuid4())
     payload = {
         "context_id": context_id,
@@ -52,7 +51,6 @@ def append(context_id: str, action: str, detail: str) -> dict:
 
 def list_history(context_id: str) -> list[dict]:
     client = get_client()
-    _ensure_collection()
     results, _ = client.scroll(
         collection_name=settings.qdrant_history_collection,
         scroll_filter=models.Filter(must=[
@@ -68,7 +66,6 @@ def list_history(context_id: str) -> list[dict]:
 
 def delete_history_for_context(context_id: str) -> None:
     client = get_client()
-    _ensure_collection()
     client.delete(
         collection_name=settings.qdrant_history_collection,
         points_selector=models.FilterSelector(

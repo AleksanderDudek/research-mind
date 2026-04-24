@@ -18,6 +18,7 @@ from app.services.source_store import (
     delete_sources_for_context,
 )
 from app.services.history_store import list_history, delete_history_for_context
+from app.services.chat_store import save_message, list_messages, delete_messages_for_context
 from app.services.vector_store import VectorStore
 from app.services.ingestion import IngestionService
 
@@ -79,6 +80,7 @@ def delete_context_endpoint(context_id: str, store: StoreDep) -> dict:
     store.delete_by_context(context_id)
     delete_sources_for_context(context_id)
     delete_history_for_context(context_id)
+    delete_messages_for_context(context_id)
     delete_context(context_id)
     logger.info(f"Fully deleted context {context_id!r}")
     return {"deleted": context_id}
@@ -88,7 +90,10 @@ def delete_context_endpoint(context_id: str, store: StoreDep) -> dict:
 
 @router.get("/{context_id}/sources")
 def get_sources(context_id: str) -> list:
-    return list_sources(context_id)
+    sources = list_sources(context_id)
+    for s in sources:
+        s.pop("image_data", None)  # too large for list view; fetched individually
+    return sources
 
 
 @router.get("/{context_id}/sources/{document_id}/text", responses=_404)
@@ -96,7 +101,13 @@ def get_source_text(context_id: str, document_id: str) -> dict:
     source = get_source(context_id, document_id)
     if source is None:
         raise HTTPException(status_code=404, detail="Source not found")
-    return {"raw_text": source.get("raw_text", ""), "title": source.get("title", ""), "source_type": source.get("source_type", "")}
+    return {
+        "raw_text": source.get("raw_text", ""),
+        "title": source.get("title", ""),
+        "source_type": source.get("source_type", ""),
+        "image_data": source.get("image_data"),
+        "image_mime_type": source.get("image_mime_type"),
+    }
 
 
 @router.put("/{context_id}/sources/{document_id}", responses={**_404, **_400})
@@ -135,3 +146,32 @@ def delete_source_endpoint(context_id: str, document_id: str, store: StoreDep) -
 @router.get("/{context_id}/history")
 def get_history(context_id: str) -> list:
     return list_history(context_id)
+
+
+# ── Chat messages ────────────────────────────────────────────────────────────────
+
+class SaveMessageRequest(BaseModel):
+    role: str
+    content: str
+    sources: list | None = None
+    action_taken: str | None = None
+    iterations: int | None = None
+    critique: dict | None = None
+
+
+@router.get("/{context_id}/messages")
+def get_messages(context_id: str) -> list:
+    return list_messages(context_id)
+
+
+@router.post("/{context_id}/messages")
+def post_message(context_id: str, req: SaveMessageRequest) -> dict:
+    return save_message(
+        context_id=context_id,
+        role=req.role,
+        content=req.content,
+        sources=req.sources,
+        action_taken=req.action_taken,
+        iterations=req.iterations,
+        critique=req.critique,
+    )
