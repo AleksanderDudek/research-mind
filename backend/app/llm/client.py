@@ -44,3 +44,39 @@ class LLMClient:
             **extra,
         )
         return response.choices[0].message.content or ""
+
+    _VISION_PROMPTS = {
+        "quick": "Describe this image in 1-2 sentences.",
+        "standard": (
+            "Describe this image in detail, including all visible objects, people, "
+            "scene, colors and any text."
+        ),
+        "detailed": (
+            "Provide a comprehensive analysis of this image: every visible object, "
+            "people and their attributes, spatial relationships, any text or numbers, "
+            "colors, mood, context and any notable details."
+        ),
+    }
+
+    @classmethod
+    async def complete_vision(
+        cls,
+        image_b64: str,
+        mime_type: str,
+        detail_level: str = "standard",
+        model: str | None = None,
+    ) -> str:
+        client = cls.get()
+        prompt = cls._VISION_PROMPTS.get(detail_level, cls._VISION_PROMPTS["standard"])
+        response = await client.chat.completions.create(
+            model=model or settings.vision_model,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{image_b64}"}},
+                    {"type": "text", "text": prompt},
+                ],
+            }],
+            temperature=0.1,
+        )
+        return response.choices[0].message.content or ""

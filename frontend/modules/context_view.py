@@ -1,111 +1,70 @@
+import html as _html
 import streamlit as st
 
-from .api_client import api_get, api_put, api_delete
 from .chat import chat_content
-from .sidebar import sidebar_content
+from .sidebar import (
+    _rename_dialog,
+    _tab_pdf_url, _tab_web, _tab_upload, _tab_text, _tab_image, _tab_audio,
+    _sources_accordion, _history_accordion,
+)
 
 
-def _sources_tab(T: dict[str, str], context_id: str) -> None:
-    try:
-        sources = api_get(f"/contexts/{context_id}/sources")
-    except Exception as e:
-        st.error(T["error_prefix"].format(e))
-        return
+def _context_header(t: dict, ctx: dict) -> None:
+    ctx_id = ctx["context_id"]
+    name = _html.escape(ctx["name"])
 
-    if not sources:
-        st.info(T["ctx_sources_empty"])
-        return
-
-    for src in sources:
-        doc_id = src.get("document_id", "")
-        title = src.get("title") or doc_id
-        source_type = src.get("source_type", "")
-        chunk_count = src.get("chunk_count", 0)
-        ingested_at = src.get("ingested_at", "")[:10]
-
-        with st.container(border=True):
-            col_info, col_del = st.columns([5, 1])
-            with col_info:
-                st.markdown(f"**{title}**")
-                st.caption(f"{T['ctx_source_type']}: {source_type} · {chunk_count} {T['ctx_chunks']} · {ingested_at}")
-            with col_del:
-                if st.button(
-                    T["ctx_delete_source"],
-                    key=f"delsrc_{doc_id}",
-                    use_container_width=True,
-                ):
-                    try:
-                        api_delete(f"/contexts/{context_id}/sources/{doc_id}")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(T["error_prefix"].format(e))
-
-            with st.expander(T["ctx_edit_source"]):
-                try:
-                    raw = api_get(f"/contexts/{context_id}/sources/{doc_id}/text")
-                    edit_title = st.text_input(
-                        T["label_text_title"],
-                        value=raw.get("title", title),
-                        key=f"edit_title_{doc_id}",
-                    )
-                    edit_text = st.text_area(
-                        T["label_text_area"],
-                        value=raw.get("raw_text", ""),
-                        height=250,
-                        key=f"edit_text_{doc_id}",
-                    )
-                    if st.button(T["ctx_save_source"], key=f"save_{doc_id}"):
-                        try:
-                            api_put(
-                                f"/contexts/{context_id}/sources/{doc_id}",
-                                {"text": edit_text, "title": edit_title},
-                            )
-                            st.success(T["status_done"])
-                            st.rerun()
-                        except Exception as e:
-                            st.error(T["error_prefix"].format(e))
-                except Exception as e:
-                    st.error(T["error_prefix"].format(e))
+    col_back, col_title, col_edit = st.columns([2, 7, 1])
+    with col_back:
+        if st.button(t["ctx_back"], key="btn_back", use_container_width=True):
+            st.session_state.active_context = None
+            st.session_state.messages = []
+            st.session_state.pop("editing_context_name", None)
+            st.rerun()
+    with col_title:
+        st.markdown(f'<div class="rm-ctx-title">{name}</div>', unsafe_allow_html=True)
+    with col_edit:
+        if st.button("✏️", key="btn_rename_ctx", help=t["ctx_rename"]):
+            _rename_dialog(ctx_id, ctx["name"], t)
+    st.divider()
 
 
-def _history_tab(T: dict[str, str], context_id: str) -> None:
-    try:
-        entries = api_get(f"/contexts/{context_id}/history")
-    except Exception as e:
-        st.error(T["error_prefix"].format(e))
-        return
-
-    if not entries:
-        st.info(T["ctx_history_empty"])
-        return
-
-    for entry in entries:
-        ts = entry.get("timestamp", "")[:19].replace("T", " ")
-        action = entry.get("action", "")
-        detail = entry.get("detail", "")
-        st.markdown(f"`{ts}` **{action}** — {detail}")
+_SOURCE_KEYS = ["tab_pdf_url", "tab_web", "tab_upload", "tab_text", "tab_image", "tab_audio"]
+_SOURCE_ICONS = ["📄", "🌐", "📎", "📝", "🖼️", "🎵"]
+_SOURCE_FNS = [_tab_pdf_url, _tab_web, _tab_upload, _tab_text, _tab_image, _tab_audio]
 
 
-def context_view(T: dict[str, str], lang: str, ctx: dict) -> None:
-    if st.button(T["ctx_back"]):
-        st.session_state.active_context = None
-        st.rerun()
+def _sources_tab(t: dict, ctx_id: str) -> None:
+    if msg := st.session_state.pop("_ingest_ok", None):
+        st.success(msg)
 
-    st.title(ctx["name"])
+    options = [f"{icon} {t[key]}" for icon, key in zip(_SOURCE_ICONS, _SOURCE_KEYS)]
+    selected = st.pills(
+        "source_type",
+        options=options,
+        selection_mode="single",
+        default=options[0],
+        label_visibility="collapsed",
+    )
 
-    tab_chat, tab_sources, tab_history = st.tabs([
-        T["ctx_tab_chat"],
-        T["ctx_tab_sources"],
-        T["ctx_tab_history"],
+    n = st.session_state.get("_ingest_n", 0)
+    if selected:
+        idx = options.index(selected)
+        _SOURCE_FNS[idx](t, ctx_id, n)
+
+    st.divider()
+    _sources_accordion(t, ctx_id)
+    _history_accordion(t, ctx_id)
+
+
+def context_view(t: dict, ctx: dict) -> None:
+    ctx_id = ctx["context_id"]
+    _context_header(t, ctx)
+
+    tab_chat, tab_sources = st.tabs([
+        "💬 " + t["ctx_tab_chat"],
+        "📥 " + t["ctx_tab_sources"],
     ])
-
     with tab_chat:
-        with st.sidebar:
-            sidebar_content(T, lang, context_id=ctx["context_id"])
-        chat_content(T, context_id=ctx["context_id"])
-
+        chat_content(t, context_id=ctx_id)
     with tab_sources:
-        _sources_tab(T, ctx["context_id"])
-
-    with tab_history:
-        _history_tab(T, ctx["context_id"])
+        _sources_tab(t, ctx_id)

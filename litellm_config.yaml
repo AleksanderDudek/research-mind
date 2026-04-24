@@ -9,6 +9,11 @@ model_list:
       model: ollama/qwen2.5:3b
       api_base: http://ollama:11434
 
+  - model_name: local-vision
+    litellm_params:
+      model: ollama/llava:latest
+      api_base: http://ollama:11434
+
   # Groq (free tier — cloud deployment)
   - model_name: groq-llama
     litellm_params:

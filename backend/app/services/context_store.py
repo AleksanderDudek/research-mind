@@ -58,7 +58,6 @@ def _seed_legacy() -> None:
 
 def list_contexts() -> list[dict]:
     client = get_client()
-    _ensure_collection()
     results, _ = client.scroll(
         collection_name=settings.qdrant_contexts_collection,
         limit=500,
@@ -70,7 +69,6 @@ def list_contexts() -> list[dict]:
 
 def get_context(context_id: str) -> dict | None:
     client = get_client()
-    _ensure_collection()
     results = client.retrieve(
         collection_name=settings.qdrant_contexts_collection,
         ids=[context_id],
@@ -81,7 +79,6 @@ def get_context(context_id: str) -> dict | None:
 
 def create_context(name: str | None = None) -> dict:
     client = get_client()
-    _ensure_collection()
     context_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
     if not name:
@@ -102,7 +99,6 @@ def create_context(name: str | None = None) -> dict:
 
 def rename_context(context_id: str, name: str) -> dict | None:
     client = get_client()
-    _ensure_collection()
     existing = get_context(context_id)
     if not existing:
         return None
@@ -117,7 +113,6 @@ def rename_context(context_id: str, name: str) -> dict | None:
 
 def delete_context(context_id: str) -> bool:
     client = get_client()
-    _ensure_collection()
     existing = get_context(context_id)
     if not existing:
         return False
