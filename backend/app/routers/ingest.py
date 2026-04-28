@@ -6,7 +6,9 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, HttpUrl
 from loguru import logger
 
-from app.services.ingestion import IngestionService
+from app.enums import DetailLevel
+from app.schemas import IngestionResult
+from app.services.ingest import IngestionService
 
 router = APIRouter(prefix="/ingest", tags=["ingest"])
 
@@ -14,12 +16,18 @@ _400 = {400: {"description": "Bad request"}}
 _500 = {500: {"description": "Internal server error"}}
 _400_500 = {**_400, **_500}
 
+_AUDIO_EXTENSIONS: frozenset[str] = frozenset({
+    ".mp3", ".wav", ".m4a", ".ogg", ".flac", ".webm", ".mp4",
+})
+_MAX_AUDIO_MB = 100
+_MAX_IMAGE_MB = 20
 
-def get_service() -> IngestionService:
+
+def _service() -> IngestionService:
     return IngestionService()
 
 
-ServiceDep = Annotated[IngestionService, Depends(get_service)]
+ServiceDep = Annotated[IngestionService, Depends(_service)]
 
 
 class URLRequest(BaseModel):
@@ -33,9 +41,8 @@ class TextRequest(BaseModel):
     context_id: str
 
 
-@router.post("/pdf-url", responses=_400_500)
+@router.post("/pdf-url", response_model=IngestionResult, responses=_400_500)
 async def ingest_pdf_from_url(req: URLRequest, service: ServiceDep) -> dict:
-    """Źródło 1: link do pliku PDF."""
     try:
         return await service.ingest_pdf_url(str(req.url), req.context_id)
     except ValueError as e:
@@ -45,9 +52,8 @@ async def ingest_pdf_from_url(req: URLRequest, service: ServiceDep) -> dict:
         raise HTTPException(status_code=500, detail="PDF URL ingestion failed")
 
 
-@router.post("/web-url", responses=_400_500)
+@router.post("/web-url", response_model=IngestionResult, responses=_400_500)
 async def ingest_web_page(req: URLRequest, service: ServiceDep) -> dict:
-    """Źródło 2: link do strony WWW."""
     try:
         return await service.ingest_web_url(str(req.url), req.context_id)
     except ValueError as e:
@@ -57,18 +63,16 @@ async def ingest_web_page(req: URLRequest, service: ServiceDep) -> dict:
         raise HTTPException(status_code=500, detail="Web ingestion failed")
 
 
-@router.post("/pdf-upload", responses=_400_500)
+@router.post("/pdf-upload", response_model=IngestionResult, responses=_400_500)
 async def ingest_pdf_upload(
-    file: Annotated[UploadFile, File(...)],
+    file: Annotated[UploadFile, File()],
     context_id: Annotated[str, Form()],
     service: ServiceDep,
 ) -> dict:
-    """Źródło 3: upload pliku PDF."""
-    if not file.filename or not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Plik musi mieć rozszerzenie .pdf")
+    if not (file.filename or "").lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="File must have .pdf extension.")
     try:
-        pdf_bytes = await file.read()
-        return service.ingest_pdf_bytes(pdf_bytes, source=file.filename, context_id=context_id)
+        return service.ingest_pdf_bytes(await file.read(), source=file.filename or "upload.pdf", context_id=context_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
@@ -76,11 +80,10 @@ async def ingest_pdf_upload(
         raise HTTPException(status_code=500, detail="PDF upload ingestion failed")
 
 
-@router.post("/raw-text", responses=_400_500)
+@router.post("/raw-text", response_model=IngestionResult, responses=_400_500)
 async def ingest_raw_text(req: TextRequest, service: ServiceDep) -> dict:
-    """Źródło 4: wklejony tekst."""
     if len(req.text.strip()) < 50:
-        raise HTTPException(status_code=400, detail="Tekst za krótki (min. 50 znaków).")
+        raise HTTPException(status_code=400, detail="Text too short (min 50 characters).")
     try:
         return service.ingest_raw_text(req.text, req.title, req.context_id)
     except ValueError as e:
@@ -90,21 +93,15 @@ async def ingest_raw_text(req: TextRequest, service: ServiceDep) -> dict:
         raise HTTPException(status_code=500, detail="Raw text ingestion failed")
 
 
-_AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".ogg", ".flac", ".webm", ".mp4"}
-_MAX_AUDIO_MB = 100
-_MAX_IMAGE_MB = 20
-
-
-@router.post("/image-upload", responses=_400_500)
+@router.post("/image-upload", response_model=IngestionResult, responses=_400_500)
 async def ingest_image(
-    file: Annotated[UploadFile, File(...)],
+    file: Annotated[UploadFile, File()],
     context_id: Annotated[str, Form()],
     service: ServiceDep,
-    detail_level: Annotated[str, Form()] = "standard",
+    detail_level: Annotated[str, Form()] = DetailLevel.STANDARD,
 ) -> dict:
-    """Źródło 5: wgrany obraz — opisany przez model wizyjny i zindeksowany."""
-    if detail_level not in ("quick", "standard", "detailed"):
-        detail_level = "standard"
+    if detail_level not in DetailLevel.__members__.values():
+        detail_level = DetailLevel.STANDARD
     image_bytes = await file.read()
     if len(image_bytes) > _MAX_IMAGE_MB * 1024 * 1024:
         raise HTTPException(status_code=400, detail=f"Image too large (max {_MAX_IMAGE_MB} MB).")
@@ -122,16 +119,18 @@ async def ingest_image(
         raise HTTPException(status_code=500, detail="Image ingestion failed")
 
 
-@router.post("/audio-upload", responses=_400_500)
+@router.post("/audio-upload", response_model=IngestionResult, responses=_400_500)
 async def ingest_audio(
-    file: Annotated[UploadFile, File(...)],
+    file: Annotated[UploadFile, File()],
     context_id: Annotated[str, Form()],
     service: ServiceDep,
 ) -> dict:
-    """Źródło 6: wgrany plik audio — transkrybowany przez Whisper i zindeksowany."""
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in _AUDIO_EXTENSIONS:
-        raise HTTPException(status_code=400, detail=f"Unsupported format. Allowed: {', '.join(_AUDIO_EXTENSIONS)}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported format. Allowed: {', '.join(sorted(_AUDIO_EXTENSIONS))}",
+        )
     audio_bytes = await file.read()
     if len(audio_bytes) > _MAX_AUDIO_MB * 1024 * 1024:
         raise HTTPException(status_code=400, detail=f"File too large (max {_MAX_AUDIO_MB} MB).")

@@ -2,7 +2,7 @@ import html as _html
 import streamlit as st
 
 from .api_client import api_get, api_post, api_delete
-from .sidebar import _rename_dialog
+from .ingest import lang_toggle, rename_dialog
 
 
 def _render_delete_confirm(t: dict, ctx: dict, del_key: str) -> None:
@@ -24,7 +24,7 @@ def _render_delete_confirm(t: dict, ctx: dict, del_key: str) -> None:
 
 
 def _render_card(t: dict, ctx: dict) -> None:
-    ctx_id = ctx["context_id"]
+    ctx_id  = ctx["context_id"]
     del_key = f"_confirm_del_{ctx_id}"
 
     if st.session_state.get(del_key):
@@ -38,7 +38,7 @@ def _render_card(t: dict, ctx: dict) -> None:
         st.markdown(f"**{ctx['name']}**  \n{date}")
     with col_ren:
         if st.button("✏️", key=f"ren_{ctx_id}", use_container_width=True, help=t["ctx_rename"]):
-            _rename_dialog(ctx_id, ctx["name"], t)
+            rename_dialog(ctx_id, ctx["name"], t)
     with col_del:
         if st.button("🗑️", key=f"del_{ctx_id}", use_container_width=True, help=t["ctx_delete"]):
             st.session_state[del_key] = True

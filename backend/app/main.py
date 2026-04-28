@@ -6,20 +6,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from app.config import settings
-from app.routers import ingest, query, contexts
-from app.services.context_store import _ensure_collection as _ensure_contexts
-from app.services.source_store import _ensure_collection as _ensure_sources
-from app.services.history_store import _ensure_collection as _ensure_history
-from app.services.chat_store import _ensure_collection as _ensure_chat
+from app.routers import contexts, history, ingest, messages, query, sources
+from app.services.stores.chat_store import _ensure_collection as _ensure_chat
+from app.services.stores.context_store import _ensure_collection as _ensure_contexts
+from app.services.stores.history_store import _ensure_collection as _ensure_history
+from app.services.stores.source_store import _ensure_collection as _ensure_sources
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    logger.info("ResearchMind API starting up — initialising collections…")
     _ensure_contexts()
     _ensure_sources()
     _ensure_history()
     _ensure_chat()
-    logger.info("ResearchMind API starting up...")
+    logger.info("All collections ready.")
     yield
     logger.info("ResearchMind API shutting down.")
 
@@ -27,21 +28,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 app = FastAPI(
     title="ResearchMind API",
     version="0.1.0",
-    description="Platforma RAG do analizy badań naukowych",
     lifespan=lifespan,
 )
 
-_origins = [o.strip() for o in settings.cors_origins.split(",")]
+_origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_origins,
+    allow_origins=_origins or ["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(ingest.router)
-app.include_router(query.router)
-app.include_router(contexts.router)
+for _router in (ingest.router, query.router, contexts.router,
+                sources.router, history.router, messages.router):
+    app.include_router(_router)
 
 
 @app.get("/health")

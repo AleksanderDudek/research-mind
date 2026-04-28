@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from loguru import logger
 
+from app.schemas import TranscribeResult
 from app.services.embedder import Embedder
 from app.services.transcriber import Transcriber
 from app.services.vector_store import VectorStore
@@ -93,7 +94,7 @@ async def ask_agent(req: AskRequest, agent: AgentDep) -> dict:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/transcribe", responses=_500)
+@router.post("/transcribe", response_model=TranscribeResult, responses=_500)
 async def transcribe_audio(file: Annotated[UploadFile, File()]) -> dict:
     """Transcribes uploaded audio to text using Whisper."""
     try:
