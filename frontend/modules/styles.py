@@ -8,6 +8,11 @@ section[data-testid="stSidebar"],
     display: none !important;
 }
 
+/* ── Hide Streamlit toolbar ─────────────────────────────────────────────────── */
+header[data-testid="stHeader"] {
+    display: none !important;
+}
+
 /* ── Mobile-first layout ────────────────────────────────────────────────────── */
 .block-container {
     max-width: 640px !important;
@@ -47,6 +52,37 @@ div[data-testid="stApp"][data-stale="true"]::before {
     100% { background-position: -200% 0; }
 }
 
+/* ── Sticky page header (back/name/rename row or home title) ────────────────── */
+.block-container > [data-testid="stVerticalBlock"] > div:first-child {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(255, 255, 255, 0.97);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    padding-bottom: 0.35rem;
+}
+
+/* ── Keep columns horizontal on narrow screens ──────────────────────────────── */
+[data-testid="stHorizontalBlock"] {
+    flex-wrap: nowrap !important;
+    align-items: flex-start !important;
+    gap: 0.4rem !important;
+}
+[data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+    min-width: 0 !important;
+}
+
+/* ── Tighten element vertical spacing ───────────────────────────────────────── */
+[data-testid="stVerticalBlock"] > [data-testid="stVerticalBlock"] {
+    gap: 0.25rem !important;
+}
+
+/* ── Tab label spacing (emoji ↔ text) ───────────────────────────────────────── */
+[data-testid="stTab"] p {
+    letter-spacing: 0.01em;
+}
+
 /* ── Chat message fade-in ───────────────────────────────────────────────────── */
 div[data-testid="stChatMessage"] {
     animation: msg-in 0.2s ease-out;
@@ -56,28 +92,64 @@ div[data-testid="stChatMessage"] {
     to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Context card rows (pure HTML elements, no Streamlit wrapper) ────────────── */
-.rm-card {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    padding: 0.85rem 0 0.2rem;
-}
-.rm-card-name {
-    font-weight: 600;
-    font-size: 1rem;
-    color: #0F172A;
-}
-.rm-card-meta {
-    font-size: 0.8rem;
-    color: #94A3B8;
-    white-space: nowrap;
-    padding-left: 0.5rem;
-}
+/* ── Card separator ─────────────────────────────────────────────────────────── */
 .rm-sep {
     height: 1px;
     background: #F1F5F9;
-    margin: 0.5rem 0 0.25rem;
+    margin: 0.25rem 0 0.35rem;
+}
+
+/* ── Voice toggle buttons — hidden off-screen, JS clicks them ───────────────── */
+.st-key-rm-voice-on,
+.st-key-rm-voice-off {
+    position: fixed !important;
+    left: -9999px !important;
+    top: -9999px !important;
+    opacity: 0 !important;
+    z-index: -1 !important;
+}
+
+/* ── Voice mode: hide chat input, hide mic FAB ───────────────────────────────── */
+body:has(#rm-voice-active) [data-testid="stChatInputContainer"] {
+    display: none !important;
+}
+body:has(#rm-voice-active) #rm-mic-fab {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* ── Voice circle — centred, state driven by body class (not element className) ─ */
+#rm-voice-circle-main {
+    margin: 3rem auto 2rem;
+}
+/* Thinking state: body class set by JS so React can't overwrite it */
+body.rm-voice-thinking #rm-voice-circle-main {
+    background: radial-gradient(circle at 35% 35%, #6EE7B7, #10B981) !important;
+    animation: rm-spin 1.4s linear infinite !important;
+}
+
+/* ── Voice conversation animated circle ─────────────────────────────────────── */
+.rm-voice-circle {
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    margin: 1.5rem auto;
+    background: radial-gradient(circle at 35% 35%, #818CF8, #4F46E5);
+    box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.35);
+    animation: rm-idle 2.5s ease-in-out infinite;
+}
+.rm-voice-circle--thinking {
+    background: radial-gradient(circle at 35% 35%, #6EE7B7, #10B981);
+    animation: rm-spin 1.4s linear infinite;
+}
+@keyframes rm-idle {
+    0%, 100% { transform: scale(1);    box-shadow: 0 0 0  0px rgba(79, 70, 229, 0.35); }
+    50%       { transform: scale(1.1); box-shadow: 0 0 0 16px rgba(79, 70, 229, 0);    }
+}
+@keyframes rm-spin {
+    0%   { transform: scale(1)   rotate(0deg); }
+    50%  { transform: scale(1.1) rotate(180deg); }
+    100% { transform: scale(1)   rotate(360deg); }
 }
 
 /* ── Pending question recovery banner ───────────────────────────────────────── */

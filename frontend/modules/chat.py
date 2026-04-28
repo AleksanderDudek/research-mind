@@ -1,6 +1,7 @@
 import base64
 
 import streamlit as st
+import streamlit.components.v1 as _components
 
 from .api_client import api_get, api_post
 
@@ -76,6 +77,13 @@ def _render_history(t: dict[str, str]) -> None:
         _render_pair(t, user_msg, asst_msg, show_sources=True)
 
 
+def _scroll_to_bottom() -> None:
+    _components.html(
+        "<script>window.parent.scrollTo({top: window.parent.document.body.scrollHeight, behavior: 'smooth'});</script>",
+        height=0,
+    )
+
+
 def _load_messages(context_id: str) -> None:
     if st.session_state.get("_chat_ctx") == context_id:
         return
@@ -84,6 +92,8 @@ def _load_messages(context_id: str) -> None:
     except Exception:
         st.session_state.messages = []
     st.session_state["_chat_ctx"] = context_id
+    if st.session_state.messages:
+        st.session_state["_scroll_to_bottom"] = True
 
 
 def _persist_message(context_id: str, msg: dict) -> None:
@@ -169,5 +179,37 @@ def chat_content(t: dict[str, str], context_id: str | None = None) -> None:
     _check_pending(t, context_id)
     _render_history(t)
 
+    if st.session_state.pop("_scroll_to_bottom", False):
+        _scroll_to_bottom()
+
+    from .voice import inject_voice_fab
+
+    voice_on = st.session_state.get("_voice_conv_active", False)
+
+    # Two hidden toggle buttons — JS clicks these to flip voice mode.
+    # Plain st.button inside a keyed container is the most reliable JS-clickable widget.
+    with st.container(key="rm-voice-on"):
+        if st.button("▶", key="_rm_voice_on_btn"):
+            st.session_state["_voice_conv_active"] = True
+            st.rerun()
+    with st.container(key="rm-voice-off"):
+        if st.button("⏹", key="_rm_voice_off_btn"):
+            st.session_state["_voice_conv_active"] = False
+            st.rerun()
+
+    # Voice mode: show animated circle; chat input hidden by CSS
+    if voice_on:
+        st.markdown('<div id="rm-voice-active" style="display:none"></div>',
+                    unsafe_allow_html=True)
+        _, col, _ = st.columns([1, 2, 1])
+        with col:
+            st.markdown(
+                '<div class="rm-voice-circle" id="rm-voice-circle-main"></div>',
+                unsafe_allow_html=True,
+            )
+
+    inject_voice_fab()
+
+    # Chat input is always rendered — hidden by CSS in voice mode so JS can still submit
     if prompt := st.chat_input(t["chat_placeholder"]):
         _run_question(t, context_id, prompt)

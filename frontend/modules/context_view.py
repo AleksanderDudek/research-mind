@@ -23,7 +23,7 @@ def _context_header(t: dict, ctx: dict) -> None:
     with col_title:
         st.markdown(f'<div class="rm-ctx-title">{name}</div>', unsafe_allow_html=True)
     with col_edit:
-        if st.button("✏️", key="btn_rename_ctx", help=t["ctx_rename"]):
+        if st.button("✏️", key="btn_rename_ctx", use_container_width=True, help=t["ctx_rename"]):
             _rename_dialog(ctx_id, ctx["name"], t)
     st.divider()
 
@@ -61,8 +61,8 @@ def context_view(t: dict, ctx: dict) -> None:
     _context_header(t, ctx)
 
     tab_chat, tab_sources = st.tabs([
-        "💬 " + t["ctx_tab_chat"],
-        "📥 " + t["ctx_tab_sources"],
+        "💬 " + t["ctx_tab_chat"],
+        "📥 " + t["ctx_tab_sources"],
     ])
     with tab_chat:
         chat_content(t, context_id=ctx_id)

@@ -1,10 +1,11 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from loguru import logger
 
 from app.services.embedder import Embedder
+from app.services.transcriber import Transcriber
 from app.services.vector_store import VectorStore
 from app.agents.research_agent import ResearchAgent
 
@@ -89,4 +90,20 @@ async def ask_agent(req: AskRequest, agent: AgentDep) -> dict:
         return result
     except Exception as e:
         logger.exception("Agent failed")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/transcribe", responses=_500)
+async def transcribe_audio(file: Annotated[UploadFile, File()]) -> dict:
+    """Transcribes uploaded audio to text using Whisper."""
+    try:
+        audio_bytes = await file.read()
+        if not audio_bytes:
+            raise HTTPException(status_code=400, detail="Empty audio file")
+        text = Transcriber().transcribe(audio_bytes, file.filename or "audio.webm")
+        return {"text": text}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Transcription failed")
         raise HTTPException(status_code=500, detail=str(e))
