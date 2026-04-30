@@ -50,7 +50,7 @@ export function ContextPanel() {
             <span className="font-bold text-slate-900 tracking-tight">ResearchMind</span>
           </div>
           <a
-            href={`?lang=${lang === 'en' ? 'pl' : 'en'}`}
+            href={lang === 'en' ? '/pl' : '/en'}
             className="text-sm text-slate-500 hover:text-brand transition-colors"
           >
             {t('langToggle')}

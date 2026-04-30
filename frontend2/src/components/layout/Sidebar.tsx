@@ -68,7 +68,7 @@ export function Sidebar({ ctx, tab, sourceCount, onTab, onBack }: Props) {
       {/* Lang toggle */}
       <div className="px-4 py-3 border-t border-border">
         <a
-          href={`?lang=${lang === 'en' ? 'pl' : 'en'}`}
+          href={lang === 'en' ? '/pl' : '/en'}
           className="flex items-center gap-2 text-xs text-slate-400 hover:text-brand transition-colors"
         >
           <Languages size={14} />
