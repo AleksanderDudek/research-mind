@@ -51,11 +51,10 @@ export function ContextView() {
 
         {/* Panel content */}
         <div className="flex-1 overflow-hidden">
-          {tab === 'chat'       && <ChatView onVoiceOpen={() => setVoiceOn(true)} />}
-          {tab === 'add-source' && <IngestPanel />}
-          {tab === 'sources'    && <IngestPanel />}
-          {tab === 'history'    && <HistoryPanel />}
-          {tab === 'settings'   && <SettingsPanel />}
+          {tab === 'chat'     && <ChatView onVoiceOpen={() => setVoiceOn(true)} />}
+          {tab === 'sources'  && <IngestPanel />}
+          {tab === 'history'  && <HistoryPanel />}
+          {tab === 'settings' && <SettingsPanel />}
         </div>
       </main>
 

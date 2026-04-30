@@ -1,26 +1,25 @@
 'use client'
 
-import { MessageSquare, PlusCircle, FileText, History, Settings, Languages } from 'lucide-react'
+import { MessageSquare, FileText, History, Settings, Languages } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useT, useLang } from '@/i18n/config'
 import type { Context } from '@/lib/types'
 
-export type SidebarTab = 'chat' | 'add-source' | 'sources' | 'history' | 'settings'
+export type SidebarTab = 'chat' | 'sources' | 'history' | 'settings'
 
 interface Props {
-  readonly ctx:        Context
-  readonly tab:        SidebarTab
+  readonly ctx:         Context
+  readonly tab:         SidebarTab
   readonly sourceCount: number
-  readonly onTab:      (t: SidebarTab) => void
-  readonly onBack:     () => void
+  readonly onTab:       (t: SidebarTab) => void
+  readonly onBack:      () => void
 }
 
 const NAV: { id: SidebarTab; Icon: typeof MessageSquare; label: string; badge?: (n: number) => string }[] = [
-  { id: 'chat',       Icon: MessageSquare, label: 'Chat'       },
-  { id: 'add-source', Icon: PlusCircle,    label: 'Add source' },
-  { id: 'sources',    Icon: FileText,      label: 'Sources', badge: n => String(n) },
-  { id: 'history',    Icon: History,       label: 'History'    },
-  { id: 'settings',   Icon: Settings,      label: 'Settings'   },
+  { id: 'chat',     Icon: MessageSquare, label: 'Chat'    },
+  { id: 'sources',  Icon: FileText,      label: 'Sources', badge: String },
+  { id: 'history',  Icon: History,       label: 'History' },
+  { id: 'settings', Icon: Settings,      label: 'Settings'},
 ]
 
 export function Sidebar({ ctx, tab, sourceCount, onTab, onBack }: Props) {

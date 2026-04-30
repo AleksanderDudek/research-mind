@@ -1,20 +1,19 @@
 'use client'
 
-import { MessageSquare, PlusCircle, FileText, History, Settings } from 'lucide-react'
+import { MessageSquare, FileText, History, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { SidebarTab } from './Sidebar'
 
 interface Props {
-  readonly tab:    SidebarTab
-  readonly onTab:  (t: SidebarTab) => void
+  readonly tab:   SidebarTab
+  readonly onTab: (t: SidebarTab) => void
 }
 
 const TABS: { id: SidebarTab; Icon: typeof MessageSquare; label: string }[] = [
-  { id: 'chat',       Icon: MessageSquare, label: 'Chat'    },
-  { id: 'add-source', Icon: PlusCircle,    label: 'Add'     },
-  { id: 'sources',    Icon: FileText,      label: 'Sources' },
-  { id: 'history',    Icon: History,       label: 'History' },
-  { id: 'settings',   Icon: Settings,      label: 'Settings'},
+  { id: 'chat',     Icon: MessageSquare, label: 'Chat'    },
+  { id: 'sources',  Icon: FileText,      label: 'Sources' },
+  { id: 'history',  Icon: History,       label: 'History' },
+  { id: 'settings', Icon: Settings,      label: 'Settings'},
 ]
 
 export function BottomTabs({ tab, onTab }: Props) {
@@ -36,7 +35,6 @@ export function BottomTabs({ tab, onTab }: Props) {
           </button>
         ))}
       </div>
-      {/* Safe area padding for iOS */}
       <div className="h-safe-bottom" />
     </nav>
   )

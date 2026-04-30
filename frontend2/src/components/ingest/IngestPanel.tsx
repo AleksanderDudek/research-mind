@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDropzone } from 'react-dropzone'
 import { toast } from 'sonner'
-import { Trash2, FileText, Globe, Upload, Type, Image, Mic2, HelpCircle } from 'lucide-react'
+import { Trash2, FileText, Globe, Upload, Type, Image, Mic2, HelpCircle, Mic } from 'lucide-react'
 import { ingest as ingestApi, sources as srcApi } from '@/lib/api'
 import { useT } from '@/i18n/config'
 import { useAppStore } from '@/lib/store'
@@ -13,9 +13,10 @@ import { Button } from '@/components/ui/Button'
 import { Input  } from '@/components/ui/Input'
 import { Badge  } from '@/components/ui/Badge'
 import { ScrollArea } from '@/components/ui/ScrollArea'
+import { VoiceRecorderSource } from './VoiceRecorderSource'
 import { cn } from '@/lib/utils'
 
-type SourceType = 'pdfUrl' | 'webUrl' | 'upload' | 'text' | 'image' | 'audio'
+type SourceType = 'pdfUrl' | 'webUrl' | 'upload' | 'text' | 'image' | 'audio' | 'record'
 
 interface TabDef {
   readonly key:      SourceType
@@ -31,6 +32,7 @@ const TABS: TabDef[] = [
   { key: 'text',   Icon: Type,     labelKey: 'tabText',   helpKey: 'Paste any text — notes, excerpts, summaries.' },
   { key: 'image',  Icon: Image,    labelKey: 'tabImage',  helpKey: 'Upload an image. A vision model will describe it and index the description.' },
   { key: 'audio',  Icon: Mic2,     labelKey: 'tabAudio',  helpKey: 'Upload an audio file. Whisper will transcribe it.' },
+  { key: 'record', Icon: Mic,      labelKey: 'tabRecord', helpKey: 'Record audio live (max 5 min) or upload a file (max 30 min). Preview before transcription.' },
 ]
 
 function DropZone({
@@ -206,10 +208,22 @@ export function IngestPanel() {
             </>
           )}
 
-          <Button variant="primary" className="w-full" onClick={handleSubmit}
-            disabled={isFieldEmpty} loading={mut.isPending}>
-            {t(`ingest${tab.charAt(0).toUpperCase()}${tab.slice(1)}` as never)}
-          </Button>
+          {/* Voice recorder — has its own confirm flow, rendered outside the shared submit button */}
+          {tab === 'record' && (
+            <VoiceRecorderSource
+              onConfirm={(blob, filename) => {
+                const audioFile = new File([blob], filename, { type: blob.type })
+                mut.mutate(() => ingestApi.audioUpload(audioFile, ctx.context_id))
+              }}
+            />
+          )}
+
+          {tab !== 'record' && (
+            <Button variant="primary" className="w-full" onClick={handleSubmit}
+              disabled={isFieldEmpty} loading={mut.isPending}>
+              {t(`ingest${tab.charAt(0).toUpperCase()}${tab.slice(1)}` as never)}
+            </Button>
+          )}
         </div>
 
         {/* Indexed sources */}
