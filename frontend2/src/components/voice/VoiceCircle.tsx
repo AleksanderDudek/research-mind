@@ -1,31 +1,30 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import type { VoiceStatus } from '@/hooks/useVoice'
+import type { LoopState } from '@/hooks/useVoiceLoop'
 
-interface Props { readonly status: VoiceStatus; readonly rms: number }
+interface Props { readonly state: LoopState; readonly rms: number }
 
-const COLOR: Record<VoiceStatus, string> = {
-  idle:       '#4F46E5',   // indigo  — ready / breathing
-  recording:  '#EF4444',   // red     — listening
-  processing: '#D97706',   // amber   — thinking
-  confirming: '#D97706',   // amber   — low-confidence card
-  speaking:   '#3B82F6',   // blue    — agent is speaking
+const COLOR: Record<LoopState, string> = {
+  idle:         '#4F46E5',   // indigo  — not yet started
+  recording:    '#EF4444',   // red     — listening
+  transcribing: '#D97706',   // amber   — converting
+  thinking:     '#D97706',   // amber   — agent working
+  speaking:     '#3B82F6',   // blue    — reading response
 }
 
-export function VoiceCircle({ status, rms }: Props) {
-  const color = COLOR[status]
-  const scale = status === 'recording' ? 1 + rms * 0.4 : 1
+export function VoiceCircle({ state, rms }: Props) {
+  const color = COLOR[state]
 
   return (
     <div className="relative flex items-center justify-center w-32 h-32 mx-auto">
-      {/* Outer ripple — recording or speaking */}
-      {(status === 'recording' || status === 'speaking') && (
+      {/* Outer ripple */}
+      {(state === 'recording' || state === 'speaking') && (
         <motion.div
           className="absolute inset-0 rounded-full"
           style={{ backgroundColor: color, opacity: 0.15 }}
           animate={{ scale: [1, 1.6], opacity: [0.15, 0] }}
-          transition={{ duration: status === 'speaking' ? 1.8 : 1.2, repeat: Infinity, ease: 'easeOut' }}
+          transition={{ duration: state === 'speaking' ? 1.8 : 1.2, repeat: Infinity, ease: 'easeOut' }}
         />
       )}
 
@@ -34,27 +33,27 @@ export function VoiceCircle({ status, rms }: Props) {
         className="w-24 h-24 rounded-full flex items-center justify-center shadow-lg"
         style={{ backgroundColor: color }}
         animate={{
-          scale,
-          boxShadow: status === 'recording'
-            ? `0 0 0 ${Math.round(rms * 20)}px ${color}33`
+          scale: state === 'recording' ? 1 + rms * 0.35 : 1,
+          boxShadow: state === 'recording'
+            ? `0 0 0 ${Math.round(rms * 18)}px ${color}33`
             : '0 8px 30px rgb(0 0 0 / .12)',
         }}
         transition={{ type: 'spring', stiffness: 300, damping: 20 }}
       >
-        {(status === 'processing' || status === 'confirming') && (
+        {(state === 'transcribing' || state === 'thinking') && (
           <motion.div
-            className="w-6 h-6 rounded-full border-white/30 border-t-white"
+            className="w-6 h-6 rounded-full"
             animate={{ rotate: 360 }}
             transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }}
-            style={{ borderWidth: 3, borderStyle: 'solid' }}
+            style={{ borderWidth: 3, borderStyle: 'solid', borderColor: 'rgba(255,255,255,.3)', borderTopColor: '#fff' }}
           />
         )}
-        {status === 'speaking' && (
+        {state === 'speaking' && (
           <span className="text-white text-3xl select-none">🔊</span>
         )}
-        {(status === 'idle' || status === 'recording') && (
+        {(state === 'idle' || state === 'recording') && (
           <span className="text-white text-3xl select-none">
-            {status === 'recording' ? '🎤' : '🎙️'}
+            {state === 'recording' ? '🎤' : '🎙️'}
           </span>
         )}
       </motion.div>
