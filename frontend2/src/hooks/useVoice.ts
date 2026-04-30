@@ -144,11 +144,27 @@ export function useVoice({
   return { status, rms, startListening, stopListening }
 }
 
+/** Speak *text* via the Web Speech API using the first available voice for *lang*.
+ *  Always picks the same voice across calls (no random variation). */
 export function browserTts(text: string, lang: string) {
-  if (!('speechSynthesis' in window)) return
-  window.speechSynthesis.cancel()
-  const u   = new SpeechSynthesisUtterance(text.slice(0, 800))
-  u.lang    = lang === 'pl' ? 'pl-PL' : 'en-US'
-  u.rate    = 1.0
-  window.speechSynthesis.speak(u)
+  const synth = globalThis.speechSynthesis
+  if (!synth) return
+
+  synth.cancel()
+
+  const u    = new SpeechSynthesisUtterance(text.slice(0, 800))
+  const tag  = lang === 'pl' ? 'pl' : 'en'
+  u.lang     = lang === 'pl' ? 'pl-PL' : 'en-US'
+  u.rate     = 1
+
+  // Pick the first available local voice for the language so the voice is
+  // consistent across utterances.  Falls back to browser default when the
+  // voices list is empty (e.g. before voiceschanged fires on Chrome).
+  const voices  = synth.getVoices()
+  const localVoice = voices.find(v => v.lang.toLowerCase().startsWith(tag) && v.localService)
+  const anyVoice   = voices.find(v => v.lang.toLowerCase().startsWith(tag))
+  const chosen     = localVoice ?? anyVoice
+  if (chosen) u.voice = chosen
+
+  synth.speak(u)
 }

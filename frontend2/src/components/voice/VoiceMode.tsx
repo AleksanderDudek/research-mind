@@ -21,14 +21,15 @@ interface Props { readonly onClose: () => void }
 export function VoiceMode({ onClose }: Props) {
   const t         = useT()
   const lang      = useLang()
-  const ctx       = useAppStore(s => s.activeContext)!
-  const msgs      = useAppStore(s => s.messages)
-  const appendMsg = useAppStore(s => s.appendMessage)
-  const qc        = useQueryClient()
+  const ctx          = useAppStore(s => s.activeContext)!
+  const msgs         = useAppStore(s => s.messages)
+  const appendMsg    = useAppStore(s => s.appendMessage)
+  const ttsEnabled   = useAppStore(s => s.ttsEnabled)
+  const setTtsEnabled = useAppStore(s => s.setTtsEnabled)
+  const qc           = useQueryClient()
 
   const [agentLoading, setAgentLoading] = useState(false)
   const [confirmation, setConfirmation] = useState<string | null>(null)
-  const [ttsEnabled,   setTtsEnabled]   = useState(true)
   const bottomRef     = useRef<HTMLDivElement>(null)
   const abortRef      = useRef<AbortController | null>(null)
   // Ref to startListening so onError callback can call it without being
@@ -153,7 +154,7 @@ export function VoiceMode({ onClose }: Props) {
         <div className="flex items-center gap-1">
           <Button
             size="icon" variant="ghost"
-            onClick={() => { setTtsEnabled(v => !v); globalThis.speechSynthesis?.cancel() }}
+            onClick={() => { setTtsEnabled(!ttsEnabled); globalThis.speechSynthesis?.cancel() }}
             title={ttsEnabled ? 'Mute responses' : 'Unmute responses'}
           >
             {ttsEnabled ? <Volume2 size={16} /> : <VolumeX size={16} className="text-slate-400" />}
@@ -223,6 +224,16 @@ export function VoiceMode({ onClose }: Props) {
             <StopCircle size={15} /> Interrupt query
           </Button>
         )}
+
+        {/* TTS toggle — labeled so it's unmissable */}
+        <button
+          type="button"
+          onClick={() => { setTtsEnabled(!ttsEnabled); globalThis.speechSynthesis?.cancel() }}
+          className="flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-1.5 text-sm font-medium text-slate-600 hover:border-brand hover:text-brand transition-colors"
+        >
+          {ttsEnabled ? <Volume2 size={15} /> : <VolumeX size={15} className="text-slate-400" />}
+          {ttsEnabled ? 'Voice ON' : 'Voice OFF'}
+        </button>
 
         <Button variant="ghost" size="sm" onClick={handleClose}>
           {t('typeInstead')}
