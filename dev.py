@@ -46,6 +46,14 @@ SERVICES: dict[str, dict] = {
         "color": "\033[32m",   # green
         "setup": "cd frontend && uv venv && uv pip install -r requirements.txt",
     },
+    "frontend2": {
+        "dir":   ROOT / "frontend2",
+        "port":  3000,
+        "exe":   "frontend2/node_modules/.bin/next",
+        "cmd":   ["dev", "--port", "3000"],
+        "color": "\033[33m",   # yellow
+        "setup": "cd frontend2 && npm install",
+    },
 }
 
 _BOLD  = "\033[1m"

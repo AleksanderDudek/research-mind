@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { @apply antialiased; }
+  body { @apply bg-slate-50 text-slate-900; }
+}
+
+@layer utilities {
+  .animate-pulse-slow { animation: pulse 3s cubic-bezier(.4,0,.6,1) infinite; }
+  .animate-spin-slow  { animation: spin  2s linear infinite; }
+  .animate-ping-sm    { animation: ping-sm 1s cubic-bezier(0,0,.2,1) infinite; }
+}
+
+@keyframes ping-sm {
+  75%, 100% { transform: scale(1.15); opacity: 0; }
+}
