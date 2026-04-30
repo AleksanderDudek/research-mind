@@ -52,7 +52,7 @@ SERVICES: dict[str, dict] = {
         "exe":   "frontend2/node_modules/.bin/next",
         "cmd":   ["dev", "--port", "3000"],
         "color": "\033[33m",   # yellow
-        "setup": "cd frontend2 && npm install",
+        "setup": "cd frontend2 && pnpm install",
     },
 }
 

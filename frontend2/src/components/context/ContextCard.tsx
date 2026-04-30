@@ -1,71 +1,116 @@
 'use client'
 
 import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { contexts as api } from '@/lib/api'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { motion } from 'framer-motion'
+import { toast } from 'sonner'
+import { FolderOpen, MoreHorizontal, Pencil, Trash2, Check, X } from 'lucide-react'
+import { contexts as api, sources } from '@/lib/api'
 import type { Context } from '@/lib/types'
 import { useT } from '@/i18n/config'
 import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
+import { Input  } from '@/components/ui/Input'
+import { Badge  } from '@/components/ui/Badge'
+import { Popover, PopoverTrigger, PopoverContent, PopoverItem, PopoverClose } from '@/components/ui/Popover'
 
 interface Props {
-  ctx:    Context
-  onOpen: (ctx: Context) => void
+  readonly ctx:    Context
+  readonly onOpen: (ctx: Context) => void
 }
 
 export function ContextCard({ ctx, onOpen }: Props) {
-  const t   = useT()
-  const qc  = useQueryClient()
-  const [confirmDel, setConfirmDel] = useState(false)
-  const [renaming,   setRenaming]   = useState(false)
-  const [newName,    setNewName]     = useState(ctx.name)
+  const t  = useT()
+  const qc = useQueryClient()
 
-  const del    = useMutation({ mutationFn: () => api.delete(ctx.context_id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contexts'] }) })
-  const rename = useMutation({ mutationFn: (n: string) => api.rename(ctx.context_id, n),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['contexts'] }); setRenaming(false) } })
+  const [renaming, setRenaming] = useState(false)
+  const [newName,  setNewName]  = useState(ctx.name)
 
-  if (confirmDel) return (
-    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 space-y-3">
-      <p className="text-sm font-medium text-amber-800">{t('confirmDelete')}: <strong>{ctx.name}</strong></p>
-      <div className="flex gap-2">
-        <Button variant="danger"     size="sm" onClick={() => del.mutate()}          disabled={del.isPending}>
-          {del.isPending ? '…' : t('deleteContext')}
-        </Button>
-        <Button variant="secondary"  size="sm" onClick={() => setConfirmDel(false)}>{t('cancel')}</Button>
-      </div>
-    </div>
-  )
+  const { data: srcs = [] } = useQuery({
+    queryKey: ['sources', ctx.context_id],
+    queryFn:  () => sources.list(ctx.context_id),
+    staleTime: 60_000,
+  })
 
-  if (renaming) return (
-    <div className="rounded-2xl border border-slate-200 p-4 space-y-2">
-      <Input autoFocus value={newName} onChange={e => setNewName(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter') rename.mutate(newName) }}
-        placeholder={ctx.name} />
-      <div className="flex gap-2">
-        <Button variant="primary"    size="sm" onClick={() => rename.mutate(newName)} disabled={rename.isPending || !newName.trim()}>
-          {rename.isPending ? '…' : t('save')}
-        </Button>
-        <Button variant="secondary"  size="sm" onClick={() => setRenaming(false)}>{t('cancel')}</Button>
-      </div>
-    </div>
-  )
+  const del = useMutation({
+    mutationFn: () => api.delete(ctx.context_id),
+    onSuccess:  () => { qc.invalidateQueries({ queryKey: ['contexts'] }); toast.success('Context deleted') },
+    onError:    (e) => toast.error(String(e)),
+  })
+
+  const rename = useMutation({
+    mutationFn: () => api.rename(ctx.context_id, newName.trim()),
+    onSuccess:  () => { qc.invalidateQueries({ queryKey: ['contexts'] }); setRenaming(false); toast.success('Renamed') },
+    onError:    (e) => toast.error(String(e)),
+  })
+
+  const date = new Date(ctx.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 hover:border-indigo-200 hover:shadow-sm transition-all">
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <div>
-          <p className="font-semibold text-slate-900 text-sm">{ctx.name}</p>
-          <p className="text-xs text-slate-400 mt-0.5">{ctx.created_at.slice(0, 10)}</p>
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.98 }}
+      className="group bg-surface rounded-xl border border-border shadow-sm hover:shadow-md hover:border-brand-light transition-all duration-200"
+    >
+      {renaming ? (
+        <div className="flex items-center gap-2 p-3">
+          <Input
+            autoFocus
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { rename.mutate() } else if (e.key === 'Escape') { setRenaming(false) } }}
+            className="flex-1"
+          />
+          <Button size="icon-sm" variant="primary"    onClick={() => rename.mutate()} loading={rename.isPending}><Check size={14} /></Button>
+          <Button size="icon-sm" variant="ghost"      onClick={() => setRenaming(false)}><X size={14} /></Button>
         </div>
-        <div className="flex gap-1 shrink-0">
-          <Button variant="ghost" size="sm" onClick={() => setRenaming(true)}  title={t('renameContext')}>✏️</Button>
-          <Button variant="ghost" size="sm" onClick={() => setConfirmDel(true)} title={t('deleteContext')}>🗑️</Button>
+      ) : (
+        <div className="flex items-center gap-3 p-4">
+          {/* Icon */}
+          <div className="w-10 h-10 rounded-lg bg-brand-light flex items-center justify-center text-brand shrink-0">
+            <FolderOpen size={18} />
+          </div>
+
+          {/* Content — native button for full keyboard + device accessibility */}
+          <button
+            type="button"
+            className="flex-1 min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 rounded-md"
+            onClick={() => onOpen(ctx)}
+          >
+            <p className="font-semibold text-slate-800 truncate leading-tight">{ctx.name}</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-xs text-slate-400">{date}</span>
+              <Badge size="sm">{srcs.length} {srcs.length === 1 ? 'source' : 'sources'}</Badge>
+            </div>
+          </button>
+
+          {/* Actions */}
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button size="icon-sm" variant="ghost" onClick={() => onOpen(ctx)} title={t('openContext')}>
+              <FolderOpen size={15} />
+            </Button>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button size="icon-sm" variant="ghost" title="More options">
+                  <MoreHorizontal size={15} />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end">
+                <PopoverItem onClick={() => { setNewName(ctx.name); setRenaming(true) }}>
+                  <Pencil size={14} /> {t('renameContext')}
+                </PopoverItem>
+                <PopoverClose asChild>
+                  <PopoverItem destructive onClick={() => del.mutate()}>
+                    <Trash2 size={14} /> {t('deleteContext')}
+                  </PopoverItem>
+                </PopoverClose>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
-      </div>
-      <Button variant="primary" className="w-full" onClick={() => onOpen(ctx)}>
-        {t('openContext')}
-      </Button>
-    </div>
+      )}
+    </motion.div>
   )
 }

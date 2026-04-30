@@ -3,6 +3,7 @@
 import { use } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
+import { TooltipProvider } from '@/components/ui/Tooltip'
 import { LangContext } from '@/i18n/config'
 import type { Lang } from '@/lib/types'
 
@@ -23,8 +24,15 @@ export default function LocaleLayout({
   return (
     <LangContext.Provider value={lang}>
       <QueryClientProvider client={queryClient}>
-        {children}
-        <Toaster position="bottom-center" richColors closeButton />
+        <TooltipProvider>
+          {children}
+          <Toaster
+            position="bottom-center"
+            richColors
+            closeButton
+            toastOptions={{ className: 'font-sans text-sm' }}
+          />
+        </TooltipProvider>
       </QueryClientProvider>
     </LangContext.Provider>
   )
