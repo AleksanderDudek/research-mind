@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from app.config import settings
-from app.routers import contexts, history, ingest, messages, query, sources
+from app.routers import contexts, history, ingest, messages, query, sources, voice
 from app.services.stores.chat_store import _ensure_collection as _ensure_chat
 from app.services.stores.context_store import _ensure_collection as _ensure_contexts
 from app.services.stores.history_store import _ensure_collection as _ensure_history
@@ -40,7 +40,7 @@ app.add_middleware(
 )
 
 for _router in (ingest.router, query.router, contexts.router,
-                sources.router, history.router, messages.router):
+                sources.router, history.router, messages.router, voice.router):
     app.include_router(_router)
 
 
