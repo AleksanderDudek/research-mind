@@ -4,7 +4,7 @@ import { useRef, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { X, Check, Volume2, VolumeX } from 'lucide-react'
+import { X, Check, Volume2, VolumeX, StopCircle } from 'lucide-react'
 import { messages as msgsApi, query as queryApi } from '@/lib/api'
 import { useAppStore } from '@/lib/store'
 import { useT, useLang } from '@/i18n/config'
@@ -19,18 +19,23 @@ import type { Message } from '@/lib/types'
 interface Props { readonly onClose: () => void }
 
 export function VoiceMode({ onClose }: Props) {
-  const t          = useT()
-  const lang       = useLang()
-  const ctx        = useAppStore(s => s.activeContext)!
-  const msgs       = useAppStore(s => s.messages)
-  const appendMsg  = useAppStore(s => s.appendMessage)
-  const qc         = useQueryClient()
+  const t         = useT()
+  const lang      = useLang()
+  const ctx       = useAppStore(s => s.activeContext)!
+  const msgs      = useAppStore(s => s.messages)
+  const appendMsg = useAppStore(s => s.appendMessage)
+  const qc        = useQueryClient()
 
   const [agentLoading, setAgentLoading] = useState(false)
   const [confirmation, setConfirmation] = useState<string | null>(null)
   const [ttsEnabled,   setTtsEnabled]   = useState(true)
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const bottomRef     = useRef<HTMLDivElement>(null)
+  const abortRef      = useRef<AbortController | null>(null)
+  // Ref to startListening so onError callback can call it without being
+  // listed as a dependency (avoids circular closure issues).
+  const startRef      = useRef<() => Promise<void>>(() => Promise.resolve())
 
+  // Auto-scroll
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [msgs.length, agentLoading])
@@ -39,45 +44,99 @@ export function VoiceMode({ onClose }: Props) {
     mutationFn: (msg: Omit<Message, 'timestamp'>) => msgsApi.save(ctx.context_id, msg),
   })
 
+  // ── Core send logic ───────────────────────────────────────────────────────
   const sendToAgent = async (text: string) => {
-    const userMsg: Message = { role: 'user', content: `🎤 ${text}`, timestamp: new Date().toISOString() }
+    if (agentLoading) { return }
+
+    const userMsg: Message = {
+      role: 'user', content: `🎤 ${text}`, timestamp: new Date().toISOString(),
+    }
     appendMsg(userMsg)
     setAgentLoading(true)
+
+    const ctrl = new AbortController()
+    abortRef.current = ctrl
+
     try {
-      // Persist user message first (await so the backend has it before we fetch the answer)
       await persist.mutateAsync({ role: 'user', content: text })
 
-      const res  = await queryApi.ask(text, ctx.context_id)
+      const res = await queryApi.ask(text, ctx.context_id, ctrl.signal)
+      if (ctrl.signal.aborted) { return }
+
       const asst: Message = {
         role: 'assistant', content: res.answer, timestamp: new Date().toISOString(),
         sources: res.sources, action_taken: res.action_taken, iterations: res.iterations,
       }
       appendMsg(asst)
 
-      // Persist assistant message, then force ChatView to sync from the backend
       await persist.mutateAsync({ role: 'assistant', content: res.answer, sources: res.sources })
       qc.invalidateQueries({ queryKey: ['messages', ctx.context_id] })
 
       if (ttsEnabled) { browserTts(res.answer, lang) }
+
+      // ← continuous: immediately resume listening for next turn
+      startRef.current()
     } catch (err) {
+      if ((err as Error).name === 'AbortError') {
+        // User interrupted — silently restart listening
+        startRef.current()
+        return
+      }
       toast.error('Voice response failed — please try again.')
-      console.error('[VoiceMode] sendToAgent error:', err)
+      console.error('[VoiceMode]', err)
+      startRef.current() // restart even after errors
     } finally {
       setAgentLoading(false)
+      abortRef.current = null
     }
   }
 
+  // ── Interrupt in-flight query ─────────────────────────────────────────────
+  const handleInterrupt = () => {
+    abortRef.current?.abort()
+    globalThis.speechSynthesis?.cancel()
+    // sendToAgent's finally will set agentLoading=false and its catch will restart listening
+  }
+
+  // ── useVoice hook ─────────────────────────────────────────────────────────
   const { status, rms, startListening, stopListening } = useVoice({
-    onTranscribed:   (text) => { if (!agentLoading) { sendToAgent(text) } },
+    onTranscribed:   (text) => { sendToAgent(text) },
     onLowConfidence: ({ text }) => setConfirmation(text),
-    onError:         () => {},
+    onError:         () => {
+      // LIKELY_NOISE / EMPTY — auto-restart after a short pause
+      setTimeout(() => { startRef.current() }, 400)
+    },
   })
 
-  const statusText: Record<typeof status, string> = {
-    idle:       t('tapToSpeak'),
-    recording:  'Listening…',
-    processing: t('processing'),
-    confirming: t('processing'),
+  // Keep ref in sync with latest startListening (updated every render)
+  useEffect(() => { startRef.current = startListening })
+
+  // Auto-start on mount; clean up everything on unmount
+  useEffect(() => {
+    startListening()
+    return () => {
+      stopListening()
+      abortRef.current?.abort()
+      globalThis.speechSynthesis?.cancel()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ── Status copy ───────────────────────────────────────────────────────────
+  let statusLabel: string
+  if (agentLoading)              { statusLabel = t('thinking')   }
+  else if (status === 'recording')  { statusLabel = 'Listening…'    }
+  else if (status === 'processing') { statusLabel = t('processing') }
+  else                           { statusLabel = 'Ready'          }
+
+  const circleStatus = agentLoading ? 'processing' : status
+
+  // ── Close ─────────────────────────────────────────────────────────────────
+  const handleClose = () => {
+    stopListening()
+    abortRef.current?.abort()
+    globalThis.speechSynthesis?.cancel()
+    onClose()
   }
 
   return (
@@ -92,27 +151,25 @@ export function VoiceMode({ onClose }: Props) {
       <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-border shrink-0">
         <p className="font-semibold text-slate-800 text-sm">🗣️ {t('voiceMode')}</p>
         <div className="flex items-center gap-1">
-          {/* TTS toggle */}
           <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => { setTtsEnabled(v => !v); window.speechSynthesis?.cancel() }}
-            title={ttsEnabled ? 'Mute voice responses' : 'Unmute voice responses'}
+            size="icon" variant="ghost"
+            onClick={() => { setTtsEnabled(v => !v); globalThis.speechSynthesis?.cancel() }}
+            title={ttsEnabled ? 'Mute responses' : 'Unmute responses'}
           >
             {ttsEnabled ? <Volume2 size={16} /> : <VolumeX size={16} className="text-slate-400" />}
           </Button>
-          <Button size="icon" variant="ghost" onClick={() => { stopListening(); window.speechSynthesis?.cancel(); onClose() }}>
+          <Button size="icon" variant="ghost" onClick={handleClose} title="Close voice mode">
             <X size={18} />
           </Button>
         </div>
       </div>
 
-      {/* Shared message history — same store as ChatView */}
+      {/* Shared conversation history */}
       <ScrollArea className="flex-1">
         <div className="px-4 py-4 space-y-3">
           {msgs.length === 0 ? (
             <p className="text-center text-sm text-slate-400 py-8">
-              Start speaking — your conversation will appear here.
+              Voice mode is active — start speaking.
             </p>
           ) : (
             msgs.map(m => <ChatMessage key={`${m.role}-${m.timestamp}`} msg={m} />)
@@ -134,10 +191,11 @@ export function VoiceMode({ onClose }: Props) {
             </p>
             <div className="flex gap-2">
               <Button variant="primary" size="sm" className="flex-1"
-                onClick={() => { sendToAgent(confirmation); setConfirmation(null) }}>
+                onClick={() => { setConfirmation(null); sendToAgent(confirmation) }}>
                 <Check size={14} /> {t('yesCorrect')}
               </Button>
-              <Button variant="secondary" size="sm" onClick={() => setConfirmation(null)}>
+              <Button variant="secondary" size="sm"
+                onClick={() => { setConfirmation(null); startRef.current() }}>
                 {t('discard')}
               </Button>
             </div>
@@ -145,14 +203,13 @@ export function VoiceMode({ onClose }: Props) {
         )}
       </AnimatePresence>
 
-      {/* Voice controls (pinned bottom) */}
+      {/* Voice controls — always visible at bottom */}
       <div className="shrink-0 border-t border-border px-5 py-4 flex flex-col items-center gap-3 bg-surface/95">
-        <VoiceCircle status={agentLoading ? 'processing' : status} rms={rms} />
+        <VoiceCircle status={circleStatus} rms={rms} />
 
-        <p className="text-sm font-medium text-slate-600">
-          {agentLoading ? t('thinking') : statusText[status]}
-        </p>
+        <p className="text-sm font-medium text-slate-600">{statusLabel}</p>
 
+        {/* Volume bar — visible while recording */}
         {status === 'recording' && (
           <div className="w-40 h-1 bg-slate-100 rounded-full overflow-hidden">
             <motion.div className="h-full bg-red-400 rounded-full"
@@ -160,19 +217,16 @@ export function VoiceMode({ onClose }: Props) {
           </div>
         )}
 
-        <div className="flex gap-2">
-          {status === 'idle' && !agentLoading && (
-            <Button variant="primary" onClick={startListening} className="px-8">
-              🎤 {t('tapToSpeak')}
-            </Button>
-          )}
-          {status === 'recording' && (
-            <Button variant="danger" onClick={stopListening} className="px-8">⏹ Stop</Button>
-          )}
-          <Button variant="ghost" onClick={() => { stopListening(); window.speechSynthesis?.cancel(); onClose() }}>
-            {t('typeInstead')}
+        {/* Interrupt button — only while agent is processing */}
+        {agentLoading && (
+          <Button variant="danger" onClick={handleInterrupt} className="gap-2">
+            <StopCircle size={15} /> Interrupt query
           </Button>
-        </div>
+        )}
+
+        <Button variant="ghost" size="sm" onClick={handleClose}>
+          {t('typeInstead')}
+        </Button>
       </div>
     </motion.div>
   )
