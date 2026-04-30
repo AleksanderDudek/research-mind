@@ -91,9 +91,9 @@ export function useVoice({
         console.warn('[useVoice] transcription error:', err)
         onError?.('Transcription failed.')
       } finally {
-        if (activeRef.current) {
-          setStatus('idle')
-        }
+        // Reset so the next startListening() call is not blocked by the guard.
+        activeRef.current = false
+        setStatus('idle')
       }
     }
     recorder.stop()
