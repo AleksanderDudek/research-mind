@@ -1,13 +1,20 @@
-# dependencies
-/node_modules
+# Next.js build output — never commit
+/.next/
+/out/
 
-# testing
-/coverage
+# Dependencies
+/node_modules/
 
-# production
-/build
+# Environment (copy from .env.local.example)
+.env.local
+.env.*.local
 
-# misc
+# TypeScript build info
+tsconfig.tsbuildinfo
+next-env.d.ts
+
+# OS
 .DS_Store
-.env
-npm-debug.log
+
+# Logs
+npm-debug.log*
