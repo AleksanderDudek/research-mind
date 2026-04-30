@@ -2,7 +2,8 @@
 
 import { useRef, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { X, Check, Volume2, VolumeX } from 'lucide-react'
 import { messages as msgsApi, query as queryApi } from '@/lib/api'
 import { useAppStore } from '@/lib/store'
@@ -23,13 +24,13 @@ export function VoiceMode({ onClose }: Props) {
   const ctx        = useAppStore(s => s.activeContext)!
   const msgs       = useAppStore(s => s.messages)
   const appendMsg  = useAppStore(s => s.appendMessage)
+  const qc         = useQueryClient()
 
   const [agentLoading, setAgentLoading] = useState(false)
   const [confirmation, setConfirmation] = useState<string | null>(null)
   const [ttsEnabled,   setTtsEnabled]   = useState(true)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // Auto-scroll to latest message
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [msgs.length, agentLoading])
@@ -41,19 +42,29 @@ export function VoiceMode({ onClose }: Props) {
   const sendToAgent = async (text: string) => {
     const userMsg: Message = { role: 'user', content: `🎤 ${text}`, timestamp: new Date().toISOString() }
     appendMsg(userMsg)
-    persist.mutate({ role: 'user', content: text })
     setAgentLoading(true)
     try {
+      // Persist user message first (await so the backend has it before we fetch the answer)
+      await persist.mutateAsync({ role: 'user', content: text })
+
       const res  = await queryApi.ask(text, ctx.context_id)
       const asst: Message = {
         role: 'assistant', content: res.answer, timestamp: new Date().toISOString(),
         sources: res.sources, action_taken: res.action_taken, iterations: res.iterations,
       }
       appendMsg(asst)
-      persist.mutate({ role: 'assistant', content: res.answer, sources: res.sources })
+
+      // Persist assistant message, then force ChatView to sync from the backend
+      await persist.mutateAsync({ role: 'assistant', content: res.answer, sources: res.sources })
+      qc.invalidateQueries({ queryKey: ['messages', ctx.context_id] })
+
       if (ttsEnabled) { browserTts(res.answer, lang) }
-    } catch { /* ignore */ }
-    finally { setAgentLoading(false) }
+    } catch (err) {
+      toast.error('Voice response failed — please try again.')
+      console.error('[VoiceMode] sendToAgent error:', err)
+    } finally {
+      setAgentLoading(false)
+    }
   }
 
   const { status, rms, startListening, stopListening } = useVoice({
