@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { query as queryApi } from '@/lib/api'
 
-export type VoiceStatus = 'idle' | 'recording' | 'processing' | 'confirming'
+export type VoiceStatus = 'idle' | 'recording' | 'processing' | 'confirming' | 'speaking'
 
 export interface LowConfidenceResult { text: string; suggestion: string }
 
@@ -81,13 +81,14 @@ export function useVoice({
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
         const res  = await queryApi.transcribe(blob)
         const text = res.text?.trim()
-        if (!text) {
-          onError?.("Didn't catch that.")
-          setStatus(activeRef.current ? 'idle' : 'idle')
-        } else {
+        if (text) {
           onTranscribed?.(text)
+        } else {
+          onError?.("Didn't catch that.")
+          setStatus('idle')
         }
-      } catch {
+      } catch (err) {
+        console.warn('[useVoice] transcription error:', err)
         onError?.('Transcription failed.')
       } finally {
         if (activeRef.current) {
@@ -125,6 +126,7 @@ export function useVoice({
       setStatus('recording')
       rafRef.current = requestAnimationFrame(_checkSilence)
     } catch (e) {
+      console.warn('[useVoice] microphone error:', e)
       activeRef.current = false
       onError?.('Microphone access denied.')
       setStatus('idle')
@@ -146,25 +148,30 @@ export function useVoice({
 
 /** Speak *text* via the Web Speech API using the first available voice for *lang*.
  *  Always picks the same voice across calls (no random variation). */
-export function browserTts(text: string, lang: string) {
+/** Speak *text* via the Web Speech API.
+ *  Returns a Promise that resolves when the utterance finishes (onend) OR
+ *  is cancelled — e.g. by the user toggling TTS off (onerror/onend).
+ *  Callers await this before resuming microphone recording. */
+export function browserTts(text: string, lang: string): Promise<void> {
   const synth = globalThis.speechSynthesis
-  if (!synth) return
+  if (!synth) return Promise.resolve()
 
   synth.cancel()
 
-  const u    = new SpeechSynthesisUtterance(text.slice(0, 800))
-  const tag  = lang === 'pl' ? 'pl' : 'en'
-  u.lang     = lang === 'pl' ? 'pl-PL' : 'en-US'
-  u.rate     = 1
+  const u   = new SpeechSynthesisUtterance(text.slice(0, 800))
+  const tag = lang === 'pl' ? 'pl' : 'en'
+  u.lang    = lang === 'pl' ? 'pl-PL' : 'en-US'
+  u.rate    = 1
 
-  // Pick the first available local voice for the language so the voice is
-  // consistent across utterances.  Falls back to browser default when the
-  // voices list is empty (e.g. before voiceschanged fires on Chrome).
-  const voices  = synth.getVoices()
+  const voices     = synth.getVoices()
   const localVoice = voices.find(v => v.lang.toLowerCase().startsWith(tag) && v.localService)
   const anyVoice   = voices.find(v => v.lang.toLowerCase().startsWith(tag))
   const chosen     = localVoice ?? anyVoice
   if (chosen) u.voice = chosen
 
-  synth.speak(u)
+  return new Promise<void>(resolve => {
+    u.onend   = () => resolve()   // normal completion
+    u.onerror = () => resolve()   // fired by synth.cancel() → TTS toggled off
+    synth.speak(u)
+  })
 }

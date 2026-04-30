@@ -29,6 +29,7 @@ export function VoiceMode({ onClose }: Props) {
   const qc           = useQueryClient()
 
   const [agentLoading, setAgentLoading] = useState(false)
+  const [ttsSpeaking,  setTtsSpeaking]  = useState(false)
   const [confirmation, setConfirmation] = useState<string | null>(null)
   const bottomRef     = useRef<HTMLDivElement>(null)
   const abortRef      = useRef<AbortController | null>(null)
@@ -73,9 +74,15 @@ export function VoiceMode({ onClose }: Props) {
       await persist.mutateAsync({ role: 'assistant', content: res.answer, sources: res.sources })
       qc.invalidateQueries({ queryKey: ['messages', ctx.context_id] })
 
-      if (ttsEnabled) { browserTts(res.answer, lang) }
+      if (ttsEnabled) {
+        // Wait for the utterance to finish before opening the mic.
+        // synth.cancel() (e.g. TTS toggled off) fires onerror → resolves.
+        setTtsSpeaking(true)
+        await browserTts(res.answer, lang)
+        setTtsSpeaking(false)
+      }
 
-      // ← continuous: immediately resume listening for next turn
+      // Mic opens only after TTS is done (or immediately when TTS is off)
       startRef.current()
     } catch (err) {
       if ((err as Error).name === 'AbortError') {
@@ -125,12 +132,17 @@ export function VoiceMode({ onClose }: Props) {
 
   // ── Status copy ───────────────────────────────────────────────────────────
   let statusLabel: string
-  if (agentLoading)              { statusLabel = t('thinking')   }
-  else if (status === 'recording')  { statusLabel = 'Listening…'    }
-  else if (status === 'processing') { statusLabel = t('processing') }
-  else                           { statusLabel = 'Ready'          }
+  if (agentLoading)                  { statusLabel = t('thinking')   }
+  else if (ttsSpeaking)              { statusLabel = 'Speaking…'     }
+  else if (status === 'recording')   { statusLabel = 'Listening…'    }
+  else if (status === 'processing')  { statusLabel = t('processing') }
+  else                               { statusLabel = 'Ready'         }
 
-  const circleStatus = agentLoading ? 'processing' : status
+  type CircleStatus = 'idle' | 'recording' | 'processing' | 'confirming' | 'speaking'
+  let circleStatus: CircleStatus
+  if (agentLoading)    { circleStatus = 'processing' }
+  else if (ttsSpeaking){ circleStatus = 'speaking'   }
+  else                 { circleStatus = status        }
 
   // ── Close ─────────────────────────────────────────────────────────────────
   const handleClose = () => {
