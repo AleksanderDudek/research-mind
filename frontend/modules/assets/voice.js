@@ -203,6 +203,25 @@
         }
         WIN._rmStopFn = arStop;  // expose latest version for voice FAB click handler
 
+        // Wait until the Streamlit app has data-stale="true" (LLM started)
+        // or until timeout ms elapses.
+        async function waitUntilStale(timeoutMs) {
+            const t0 = Date.now();
+            while (Date.now() - t0 < timeoutMs) {
+                if (DOC.querySelector('[data-testid="stApp"][data-stale="true"]')) return;
+                await new Promise(r => WIN.setTimeout(r, 50));
+            }
+        }
+
+        // Wait until data-stale is gone (LLM + page render complete).
+        async function waitUntilNotStale(timeoutMs) {
+            const t0 = Date.now();
+            while (Date.now() - t0 < timeoutMs) {
+                if (!DOC.querySelector('[data-testid="stApp"][data-stale="true"]')) return;
+                await new Promise(r => WIN.setTimeout(r, 150));
+            }
+        }
+
         async function arProcess(chunks) {
             if (WIN._rmAborted) { WIN._rmProcessing = false; DOC.body.classList.remove('rm-voice-thinking'); return; }
             WIN._rmProcessing = true;
@@ -217,7 +236,6 @@
                         const setter = Object.getOwnPropertyDescriptor(WIN.HTMLTextAreaElement.prototype,'value').set;
                         setter.call(ta, text);
                         ta.dispatchEvent(new Event('input', {bubbles:true}));
-                        // Give React 100ms to enable the submit button, then try both methods
                         await new Promise(r => WIN.setTimeout(r, 100));
                         const sub = DOC.querySelector('[data-testid="stChatInputSubmitButton"]');
                         if (sub) {
@@ -227,12 +245,16 @@
                                 key:'Enter', code:'Enter', keyCode:13, bubbles:true, cancelable:true
                             }));
                         }
+                        // Keep _rmProcessing=true for the FULL LLM round-trip.
+                        // Without this, the 300ms guard is too short and a second
+                        // voice turn starts while the first is still in the agent.
+                        await waitUntilStale(3000);      // wait for rerun to begin
+                        await waitUntilNotStale(300000); // wait for rerun to finish
                     }
                 }
             } catch(e) { console.error('arProcess:', e); }
             finally {
-                // Small delay so Streamlit has time to mark data-stale before we clear _rmProcessing
-                WIN.setTimeout(() => { WIN._rmProcessing = false; }, 300);
+                WIN._rmProcessing = false;
             }
         }
 
