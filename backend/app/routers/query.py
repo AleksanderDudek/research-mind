@@ -1,6 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from loguru import logger
 
@@ -92,6 +93,24 @@ async def ask_agent(req: AskRequest, agent: AgentDep) -> dict:
     except Exception as e:
         logger.exception("Agent failed")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/ask/stream")
+async def ask_agent_stream(req: AskRequest, agent: AgentDep) -> StreamingResponse:
+    """Stream the agent answer as Server-Sent Events.
+
+    Each event is a JSON line: ``data: {...}\\n\\n``
+    - ``{"type":"chunk","text":"..."}`` — one LLM token
+    - ``{"type":"done","answer":"...","sources":[...],"action_taken":"..."}``
+    """
+    return StreamingResponse(
+        agent.stream_run(req.question, req.context_id),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post("/transcribe", response_model=TranscribeResult, responses=_500)

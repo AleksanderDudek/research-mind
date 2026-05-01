@@ -12,6 +12,8 @@ interface AppState {
   setActiveContext: (ctx: Context | null) => void
   setMessages:      (msgs: Message[])     => void
   appendMessage:    (msg: Message)        => void
+  updateMessage:    (timestamp: string, updater: (msg: Message) => Message) => void
+  removeMessage:    (timestamp: string)   => void
   setTtsEnabled:    (on: boolean)         => void
 }
 
@@ -24,9 +26,11 @@ export const useAppStore = create<AppState>()(
       ttsEnabled:    true,           // voice ON by default
       setLang:          (lang) => set({ lang }),
       setActiveContext: (ctx)  => set({ activeContext: ctx, messages: [] }),
-      appendMessage:    (msg)  => set((s) => ({ messages: [...s.messages, msg] })),
-      setMessages:      (msgs) => set({ messages: msgs }),
-      setTtsEnabled:    (on)   => set({ ttsEnabled: on }),
+      appendMessage:    (msg)     => set((s) => ({ messages: [...s.messages, msg] })),
+      updateMessage:    (ts, fn)  => set((s) => ({ messages: s.messages.map(m => m.timestamp === ts ? fn(m) : m) })),
+      removeMessage:    (ts)      => set((s) => ({ messages: s.messages.filter(m => m.timestamp !== ts) })),
+      setMessages:      (msgs)    => set({ messages: msgs }),
+      setTtsEnabled:    (on)      => set({ ttsEnabled: on }),
     }),
     {
       name:    'researchmind-settings',

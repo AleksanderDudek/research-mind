@@ -45,6 +45,29 @@ class LLMClient:
         )
         return response.choices[0].message.content or ""
 
+    @classmethod
+    async def stream(
+        cls,
+        prompt: str,
+        model: str | None = None,
+        temperature: float = 0.1,
+        name: str | None = None,
+    ):
+        """Yield completion tokens one at a time as an async generator."""
+        client = cls.get()
+        extra = {"name": name} if (name and _langfuse_enabled) else {}
+        response = await client.chat.completions.create(
+            model=model or settings.llm_model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=temperature,
+            stream=True,
+            **extra,
+        )
+        async for chunk in response:
+            delta = chunk.choices[0].delta.content
+            if delta:
+                yield delta
+
     _VISION_PROMPTS = {
         "quick": "Describe this image in 1-2 sentences.",
         "standard": (

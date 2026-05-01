@@ -17,14 +17,20 @@ interface Props {
 }
 
 export function ChatView({ onVoiceOpen }: Props) {
-  const t         = useT()
-  const ctx       = useAppStore(s => s.activeContext)!
-  const msgs      = useAppStore(s => s.messages)
-  const setMsgs   = useAppStore(s => s.setMessages)
-  const appendMsg = useAppStore(s => s.appendMessage)
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const abortRef  = useRef<AbortController | null>(null)
-  const [loading, setLoading] = useState(false)
+  const t            = useT()
+  const ctx          = useAppStore(s => s.activeContext)!
+  const msgs         = useAppStore(s => s.messages)
+  const setMsgs      = useAppStore(s => s.setMessages)
+  const appendMsg    = useAppStore(s => s.appendMessage)
+  const updateMsg    = useAppStore(s => s.updateMessage)
+  const removeMsg    = useAppStore(s => s.removeMessage)
+  const bottomRef    = useRef<HTMLDivElement>(null)
+  const abortRef     = useRef<AbortController | null>(null)
+
+  // loading  = request in flight (shows stop button)
+  // thinking = waiting for first token (shows typing indicator)
+  const [loading,  setLoading]  = useState(false)
+  const [thinking, setThinking] = useState(false)
 
   const { isLoading: histLoading } = useQuery({
     queryKey: ['messages', ctx.context_id],
@@ -42,40 +48,50 @@ export function ChatView({ onVoiceOpen }: Props) {
   })
 
   const handleSubmit = async (text: string) => {
-    if (loading) { return }
-    const userMsg: Message = { role: 'user', content: text, timestamp: new Date().toISOString() }
-    appendMsg(userMsg)
+    if (loading) return
+
+    appendMsg({ role: 'user', content: text, timestamp: new Date().toISOString() })
     setLoading(true)
+    setThinking(true)
+
     const ctrl = new AbortController()
     abortRef.current = ctrl
 
+    // Placeholder assistant bubble — fills in as tokens arrive
+    const ts = new Date().toISOString()
+    appendMsg({ role: 'assistant', content: '', timestamp: ts })
+
+    let hasContent = false
+
     try {
-      const res  = await queryApi.ask(text, ctx.context_id, ctrl.signal)
-      const asst: Message = {
-        role: 'assistant', content: res.answer, timestamp: new Date().toISOString(),
-        sources: res.sources, action_taken: res.action_taken,
-        iterations: res.iterations, critique: res.critique,
+      for await (const ev of queryApi.streamAsk(text, ctx.context_id, ctrl.signal)) {
+        if (ev.type === 'chunk') {
+          if (!hasContent) {
+            hasContent = true
+            setThinking(false)   // first token — hide typing indicator
+          }
+          updateMsg(ts, m => ({ ...m, content: m.content + ev.text }))
+        } else if (ev.type === 'done') {
+          updateMsg(ts, m => ({ ...m, sources: ev.sources, action_taken: ev.action_taken }))
+          persist.mutate({ role: 'user',      content: text })
+          persist.mutate({ role: 'assistant', content: ev.answer,
+            sources: ev.sources, action_taken: ev.action_taken })
+        }
       }
-      appendMsg(asst)
-      persist.mutate({ role: 'user',      content: text })
-      persist.mutate({ role: 'assistant', content: res.answer, sources: res.sources,
-        action_taken: res.action_taken, iterations: res.iterations, critique: res.critique })
     } catch (e) {
-      if ((e as Error).name !== 'AbortError') {
-        appendMsg({ role: 'assistant', content: `⚠️ ${String(e)}`, timestamp: new Date().toISOString() })
+      if ((e as Error).name === 'AbortError') {
+        if (!hasContent) removeMsg(ts)   // remove empty placeholder on early stop
+      } else {
+        updateMsg(ts, m => ({ ...m, content: `⚠️ ${String(e)}` }))
       }
     } finally {
       setLoading(false)
+      setThinking(false)
       abortRef.current = null
     }
   }
 
-  const handleStop = () => {
-    abortRef.current?.abort()
-    setLoading(false)
-    const last = msgs[msgs.length - 1]
-    if (last?.role === 'user') { setMsgs(msgs.slice(0, -1)) }
-  }
+  const handleStop = () => { abortRef.current?.abort() }
 
   return (
     <div className="flex flex-col h-full">
@@ -112,7 +128,8 @@ export function ChatView({ onVoiceOpen }: Props) {
             </AnimatePresence>
           )}
 
-          {loading && <TypingIndicator />}
+          {/* Show typing indicator only before first token arrives */}
+          {thinking && <TypingIndicator />}
           <div ref={bottomRef} />
         </div>
       </ScrollArea>

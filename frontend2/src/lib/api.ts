@@ -1,7 +1,11 @@
 import type {
   AgentResult, Context, HistoryEntry, IngestionResult,
-  Message, Source, SourceDetail,
+  Message, SearchHit, Source, SourceDetail,
 } from './types'
+
+export type StreamEvent =
+  | { type: 'chunk'; text: string }
+  | { type: 'done'; answer: string; sources: SearchHit[]; action_taken: string }
 
 const base = () =>
   typeof window !== 'undefined'
@@ -64,6 +68,38 @@ export const history = {
 export const query = {
   ask: (question: string, contextId: string | null, signal?: AbortSignal) =>
     req<AgentResult>('POST', '/query/ask', { question, context_id: contextId }, undefined, signal),
+
+  async *streamAsk(
+    question: string,
+    contextId: string | null,
+    signal?: AbortSignal,
+  ): AsyncGenerator<StreamEvent> {
+    const res = await fetch(`${base()}/query/ask/stream`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ question, context_id: contextId }),
+      signal,
+    })
+    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
+
+    const reader  = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buf = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      const parts = buf.split('\n\n')
+      buf = parts.pop() ?? ''
+      for (const part of parts) {
+        const line = part.trim()
+        if (line.startsWith('data: ')) {
+          yield JSON.parse(line.slice(6)) as StreamEvent
+        }
+      }
+    }
+  },
 
   transcribe: (audio: Blob, language?: string) => {
     const fd = new FormData()

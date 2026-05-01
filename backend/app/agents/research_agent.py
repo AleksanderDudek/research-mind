@@ -1,4 +1,4 @@
-from typing import TypedDict, Annotated
+from typing import TypedDict, Annotated, AsyncGenerator
 import operator
 import json
 from langgraph.graph import StateGraph, END
@@ -134,6 +134,75 @@ class ResearchAgent:
             logger.info(f"Retry (iteration {iteration}, score {score})")
             return "retry"
         return "done"
+
+    async def stream_run(
+        self, question: str, context_id: str | None = None
+    ) -> AsyncGenerator[str, None]:
+        """Stream the agent response as SSE-formatted lines.
+
+        Each yielded string is a complete ``data: {...}\\n\\n`` SSE line.
+        Two event types are emitted:
+          - ``{"type":"chunk","text":"..."}``  — one token from the LLM
+          - ``{"type":"done","answer":"...","sources":[...],"action_taken":"..."}``
+
+        The critic is skipped in streaming mode — the user sees the answer
+        immediately and a quality retry would not be meaningful mid-stream.
+        """
+        # 1. Route — one LLM call to classify intent
+        response = await LLMClient.complete(
+            ROUTER_PROMPT.format(question=question), name="router"
+        )
+        action = response.strip().upper().split()[0] if response else "SEARCH"
+        if action not in ("SEARCH", "CLARIFY", "DIRECT"):
+            action = "SEARCH"
+        logger.info(f"[stream] Router → {action}")
+
+        # 2. Clarify shortcut — single text chunk then done
+        if action == "CLARIFY":
+            msg = "Twoje pytanie jest niejasne. Czy mógłbyś doprecyzować, czego dokładnie szukasz?"
+            yield f'data: {json.dumps({"type": "chunk", "text": msg})}\n\n'
+            yield f'data: {json.dumps({"type": "done", "answer": msg, "sources": [], "action_taken": "CLARIFY"})}\n\n'
+            return
+
+        # 3. Retrieve (synchronous — fast Qdrant lookup)
+        context: list[dict] = []
+        if action == "SEARCH":
+            vec = self.embedder.embed_one(question)
+            filters = {"context_id": context_id} if context_id else None
+            hits = self.store.search(vec, top_k=5, filters=filters)
+            context = [
+                {
+                    "text":        h.payload.get("text"),
+                    "source":      h.payload.get("source", "unknown"),
+                    "source_type": h.payload.get("source_type"),
+                    "score":       h.score,
+                }
+                for h in hits
+            ]
+            logger.info(f"[stream] Retrieved {len(context)} chunks")
+
+        # 4. Build answer prompt
+        if context:
+            ctx_str = "\n\n".join(
+                f"[{i+1}] Źródło: {c['source']}\n{c['text']}"
+                for i, c in enumerate(context)
+            )
+        else:
+            ctx_str = "(brak kontekstu — odpowiadasz z wiedzy ogólnej)"
+
+        # 5. Stream answer tokens
+        chunks: list[str] = []
+        async for token in LLMClient.stream(
+            ANSWER_PROMPT.format(context=ctx_str, question=question),
+            temperature=0.2,
+            name="generate",
+        ):
+            chunks.append(token)
+            yield f'data: {json.dumps({"type": "chunk", "text": token})}\n\n'
+
+        # 6. Done event — carries full answer + sources so the frontend can persist
+        full_answer = "".join(chunks)
+        yield f'data: {json.dumps({"type": "done", "answer": full_answer, "sources": context, "action_taken": action})}\n\n'
 
     async def run(self, question: str, context_id: str | None = None) -> dict:
         initial_state: AgentState = {
