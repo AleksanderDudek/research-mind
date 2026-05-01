@@ -90,7 +90,7 @@ export function ContextPanel() {
             <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
               {t('recentContexts')}
             </h2>
-            {sorted.length > 4 && (
+            {sorted.length > 0 && (
               <div className="relative w-44">
                 <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
