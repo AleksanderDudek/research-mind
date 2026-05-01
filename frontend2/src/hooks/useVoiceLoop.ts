@@ -165,7 +165,7 @@ export function useVoiceLoop({ contextId, ttsEnabled, lang, onMessage, onPersist
     setState('transcribing')
     let text: string
     try {
-      const r = await queryApi.transcribe(blob)
+      const r = await queryApi.transcribe(blob, langRef.current)
       text = r.text?.trim() ?? ''
     } catch {
       // Network error — wait briefly then loop again

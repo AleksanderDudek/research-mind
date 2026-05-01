@@ -65,9 +65,10 @@ export const query = {
   ask: (question: string, contextId: string | null, signal?: AbortSignal) =>
     req<AgentResult>('POST', '/query/ask', { question, context_id: contextId }, undefined, signal),
 
-  transcribe: (audio: Blob) => {
+  transcribe: (audio: Blob, language?: string) => {
     const fd = new FormData()
     fd.append('file', audio, 'voice.webm')
+    if (language) fd.append('language', language)
     return req<{ text: string }>('POST', '/query/transcribe', undefined, fd)
   },
 }

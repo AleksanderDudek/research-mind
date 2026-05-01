@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from loguru import logger
 
@@ -95,13 +95,16 @@ async def ask_agent(req: AskRequest, agent: AgentDep) -> dict:
 
 
 @router.post("/transcribe", response_model=TranscribeResult, responses=_500)
-async def transcribe_audio(file: Annotated[UploadFile, File()]) -> dict:
+async def transcribe_audio(
+    file: Annotated[UploadFile, File()],
+    language: Annotated[str | None, Form()] = None,
+) -> dict:
     """Transcribes uploaded audio to text using Whisper."""
     try:
         audio_bytes = await file.read()
         if not audio_bytes:
             raise HTTPException(status_code=400, detail="Empty audio file")
-        text = Transcriber().transcribe(audio_bytes, file.filename or "audio.webm")
+        text = Transcriber().transcribe(audio_bytes, file.filename or "audio.webm", language=language)
         return {"text": text}
     except HTTPException:
         raise
