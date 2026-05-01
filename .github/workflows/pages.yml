@@ -1,3 +1,4 @@
+# Deploys the Next.js static export to GitHub Pages on every push to main.
 name: Deploy frontend2 to GitHub Pages
 
 on:
