@@ -50,7 +50,11 @@ export function ChatView({ onVoiceOpen }: Props) {
   const handleSubmit = async (text: string) => {
     if (loading) return
 
-    appendMsg({ role: 'user', content: text, timestamp: new Date().toISOString() })
+    const userTs = new Date().toISOString()
+    appendMsg({ role: 'user', content: text, timestamp: userTs })
+    // Persist user message immediately — don't wait for stream done
+    persist.mutate({ role: 'user', content: text })
+
     setLoading(true)
     setThinking(true)
 
@@ -73,16 +77,34 @@ export function ChatView({ onVoiceOpen }: Props) {
           updateMsg(ts, m => ({ ...m, content: m.content + ev.text }))
         } else if (ev.type === 'done') {
           updateMsg(ts, m => ({ ...m, sources: ev.sources, action_taken: ev.action_taken }))
-          persist.mutate({ role: 'user',      content: text })
           persist.mutate({ role: 'assistant', content: ev.answer,
             sources: ev.sources, action_taken: ev.action_taken })
         }
       }
     } catch (e) {
       if ((e as Error).name === 'AbortError') {
-        if (!hasContent) removeMsg(ts)   // remove empty placeholder on early stop
+        if (!hasContent) removeMsg(ts)
       } else {
-        updateMsg(ts, m => ({ ...m, content: `⚠️ ${String(e)}` }))
+        // Streaming not available (e.g. backend not yet redeployed) — fall back to
+        // the non-streaming endpoint so the user still gets an answer.
+        try {
+          setThinking(true)
+          const res = await queryApi.ask(text, ctx.context_id, ctrl.signal)
+          updateMsg(ts, m => ({
+            ...m,
+            content:      res.answer,
+            sources:      res.sources,
+            action_taken: res.action_taken,
+          }))
+          persist.mutate({ role: 'assistant', content: res.answer,
+            sources: res.sources, action_taken: res.action_taken })
+        } catch (fallbackErr) {
+          if ((fallbackErr as Error).name !== 'AbortError') {
+            updateMsg(ts, m => ({ ...m, content: `⚠️ ${String(fallbackErr)}` }))
+          } else if (!hasContent) {
+            removeMsg(ts)
+          }
+        }
       }
     } finally {
       setLoading(false)
