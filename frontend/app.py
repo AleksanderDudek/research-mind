@@ -5,13 +5,12 @@ from modules.context_view import context_view
 from modules.i18n import get_lang, get_translations
 from modules.styles import inject_styles
 
-# Must be the absolute first Streamlit command
 st.set_page_config(page_title="ResearchMind", page_icon="📚", layout="centered")
 
 inject_styles()
 
 lang = get_lang()
-T = get_translations(lang)
+T    = get_translations(lang)
 
 if "messages" not in st.session_state:
     st.session_state.messages = []

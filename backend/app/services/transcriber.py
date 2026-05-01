@@ -1,8 +1,4 @@
-"""
-Audio transcription via faster-whisper (local, CPU-optimised, no ffmpeg system dep).
-Model is loaded once on first use (lazy singleton).
-"""
-
+"""Audio transcription via faster-whisper (local, CPU-optimised)."""
 import os
 import tempfile
 
@@ -27,16 +23,23 @@ class Transcriber:
             logger.info("Whisper model loaded")
         return cls._model
 
-    def transcribe(self, audio_bytes: bytes, filename: str) -> str:
-        model = self._get_model()
+    def transcribe(self, audio_bytes: bytes, filename: str, language: str | None = None) -> str:
         ext = os.path.splitext(filename)[1].lower() or ".mp3"
+        # NamedTemporaryFile with delete=False + explicit unlink ensures
+        # the file is always removed even if transcription raises.
         with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as f:
             f.write(audio_bytes)
             tmp_path = f.name
         try:
-            segments, info = model.transcribe(tmp_path, beam_size=5)
+            model = self._get_model()
+            segments, info = model.transcribe(
+                tmp_path,
+                beam_size=5,
+                language=language,   # None = Whisper autodetects
+                vad_filter=True,     # skip silent/noisy frames before decoding
+            )
             text = " ".join(s.text.strip() for s in segments)
-            logger.info(f"Transcribed {filename!r}: {info.duration:.1f}s → {len(text)} chars")
+            logger.info(f"Transcribed {filename!r}: {info.duration:.1f}s → {len(text)} chars (lang={info.language!r})")
             return text
         finally:
             os.unlink(tmp_path)

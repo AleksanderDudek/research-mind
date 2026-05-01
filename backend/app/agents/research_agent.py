@@ -34,7 +34,7 @@ class AgentState(TypedDict):
 
 
 class ResearchAgent:
-    MAX_ITERATIONS = 2
+    MAX_ITERATIONS = 1   # one critic pass; set to 0 to skip critic entirely
 
     def __init__(self) -> None:
         self.embedder = Embedder()

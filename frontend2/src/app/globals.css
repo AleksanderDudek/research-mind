@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Design tokens ──────────────────────────────────────────────────────────── */
+:root {
+  /* Brand */
+  --color-brand:        #4F46E5;
+  --color-brand-hover:  #4338CA;
+  --color-brand-light:  #EEF2FF;
+  --color-brand-dark:   #3730A3;
+
+  /* Neutrals */
+  --color-bg:           #F8FAFC;
+  --color-surface:      #FFFFFF;
+  --color-surface-2:    #F1F5F9;
+  --color-border:       #E2E8F0;
+  --color-border-focus: #A5B4FC;
+  --color-muted:        #94A3B8;
+  --color-text:         #0F172A;
+  --color-text-muted:   #64748B;
+
+  /* Semantic */
+  --color-success:      #16A34A;
+  --color-success-bg:   #F0FDF4;
+  --color-warning:      #D97706;
+  --color-warning-bg:   #FFFBEB;
+  --color-error:        #DC2626;
+  --color-error-bg:     #FEF2F2;
+
+  /* Radii */
+  --radius-sm:  6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm:  0 1px 3px rgb(0 0 0 / .06), 0 1px 2px rgb(0 0 0 / .04);
+  --shadow-md:  0 4px 12px rgb(0 0 0 / .08), 0 2px 4px rgb(0 0 0 / .04);
+  --shadow-lg:  0 8px 30px rgb(0 0 0 / .10), 0 4px 8px rgb(0 0 0 / .05);
+  --shadow-xl:  0 20px 50px rgb(0 0 0 / .12);
+
+  /* Sidebar */
+  --sidebar-w: 260px;
+
+  /* Transition */
+  --ease: cubic-bezier(.4, 0, .2, 1);
+}
+
+/* ── Base ───────────────────────────────────────────────────────────────────── */
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    line-height: 1.6;
+    min-height: 100dvh;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--color-muted); }
+
+  /* Focus ring */
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+}
+
+/* ── Prose overrides for markdown ───────────────────────────────────────────── */
+@layer components {
+  .rm-prose {
+    @apply prose prose-sm max-w-none;
+    --tw-prose-body:        theme(colors.slate.800);
+    --tw-prose-headings:    theme(colors.slate.900);
+    --tw-prose-code:        theme(colors.indigo.700);
+    --tw-prose-pre-bg:      theme(colors.slate.100);
+    --tw-prose-links:       theme(colors.indigo.600);
+    --tw-prose-bullets:     theme(colors.slate.400);
+    --tw-prose-hr:          theme(colors.slate.200);
+    --tw-prose-th-borders:  theme(colors.slate.300);
+    --tw-prose-td-borders:  theme(colors.slate.200);
+  }
+
+  .rm-prose code {
+    @apply bg-indigo-50 text-indigo-700 rounded px-1 py-0.5 text-[0.8em];
+    font-weight: 500;
+  }
+
+  .rm-prose pre code {
+    @apply bg-transparent text-slate-200 p-0;
+  }
+
+  .rm-prose pre {
+    @apply bg-slate-800 text-slate-200 rounded-xl overflow-x-auto;
+  }
+}

@@ -2,7 +2,7 @@ import html as _html
 import streamlit as st
 
 from .api_client import api_get, api_post, api_delete
-from .sidebar import _rename_dialog
+from .ingest import lang_toggle, rename_dialog
 
 
 def _render_delete_confirm(t: dict, ctx: dict, del_key: str) -> None:
@@ -24,7 +24,7 @@ def _render_delete_confirm(t: dict, ctx: dict, del_key: str) -> None:
 
 
 def _render_card(t: dict, ctx: dict) -> None:
-    ctx_id = ctx["context_id"]
+    ctx_id  = ctx["context_id"]
     del_key = f"_confirm_del_{ctx_id}"
 
     if st.session_state.get(del_key):
@@ -32,28 +32,22 @@ def _render_card(t: dict, ctx: dict) -> None:
         st.markdown('<div class="rm-sep"></div>', unsafe_allow_html=True)
         return
 
-    name = _html.escape(ctx["name"])
     date = ctx.get("created_at", "")[:10]
-    st.markdown(
-        f'<div class="rm-card">'
-        f'<span class="rm-card-name">{name}</span>'
-        f'<span class="rm-card-meta">{date}</span>'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
-    col_open, col_ren, col_del = st.columns([5, 1, 1])
-    with col_open:
-        if st.button(t["ctx_open"] + " →", key=f"open_{ctx_id}", use_container_width=True, type="primary"):
-            st.session_state.active_context = ctx
-            st.session_state.pop("messages", None)
-            st.rerun()
+    col_name, col_ren, col_del = st.columns([6, 1, 1])
+    with col_name:
+        st.markdown(f"**{ctx['name']}**  \n{date}")
     with col_ren:
-        if st.button("✏️", key=f"ren_{ctx_id}", help=t["ctx_rename"]):
-            _rename_dialog(ctx_id, ctx["name"], t)
+        if st.button("✏️", key=f"ren_{ctx_id}", use_container_width=True, help=t["ctx_rename"]):
+            rename_dialog(ctx_id, ctx["name"], t)
     with col_del:
-        if st.button("🗑️", key=f"del_{ctx_id}", help=t["ctx_delete"]):
+        if st.button("🗑️", key=f"del_{ctx_id}", use_container_width=True, help=t["ctx_delete"]):
             st.session_state[del_key] = True
             st.rerun()
+
+    if st.button(t["ctx_open"] + " →", key=f"open_{ctx_id}", use_container_width=True, type="primary"):
+        st.session_state.active_context = ctx
+        st.session_state.pop("messages", None)
+        st.rerun()
 
     st.markdown('<div class="rm-sep"></div>', unsafe_allow_html=True)
 
@@ -83,8 +77,6 @@ def context_panel(t: dict) -> None:
             st.rerun()
         except Exception as e:
             st.error(t["error_prefix"].format(e))
-
-    st.write("")
 
     with st.spinner(t["ctx_loading"]):
         try:

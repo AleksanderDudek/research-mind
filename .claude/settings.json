@@ -1,0 +1,49 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit -m ' *)",
+      "Bash(python -m pytest tests/ -v --tb=short)",
+      "Bash(python3 -c \"import pytest\")",
+      "Bash(pip3 install *)",
+      "Bash(PYTHONPATH=. python3 -m pytest tests/ -v --tb=short)",
+      "Bash(PYTHONPATH=. python3 -m pytest tests/ -q)",
+      "Bash(PYTHONPATH=. python3 -m pytest tests/ -q --tb=short)",
+      "Bash(ps -p 66464 -o pid,command)",
+      "Bash(lsof -i :4000 -sTCP:LISTEN)",
+      "Bash(grep -v \"^$\")",
+      "Bash(.venv/bin/python -c \"import faster_whisper; print\\(faster_whisper.__version__\\)\")",
+      "Bash(python -c \"import faster_whisper; print\\(faster_whisper.__version__\\)\")",
+      "Bash(uv --version)",
+      "Bash(.venv/bin/python -c \"import sniffio; print\\(sniffio.__version__\\)\")",
+      "Bash(.venv/bin/python -c \"import sniffio\")",
+      "Bash(git commit -m 'chore: add qdrant_db/ to .gitignore *)",
+      "Bash(../.venv/bin/python -m streamlit run app.py --server.port 8501)",
+      "Bash(.venv/bin/streamlit run *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8501)",
+      "Bash(python3 -c ' *)",
+      "Bash(.venv/bin/python -c \"import streamlit; print\\(streamlit.__version__\\)\")",
+      "Bash(.venv/bin/pip install *)",
+      "Bash(.venv/bin/python -m pip install streamlit-mic-recorder -q)",
+      "Bash(.venv/bin/uv pip *)",
+      "Bash(python dev.py status)",
+      "Bash(python dev.py backend status)",
+      "Bash(python dev.py help)",
+      "Bash(python dev.py frontend restart)",
+      "Bash(curl -s http://localhost:8501)",
+      "Bash(mkdir -p /Users/pl2mac0030/researchmind/backend/app/services/stores)",
+      "Bash(mkdir -p /Users/pl2mac0030/researchmind/backend/app/services/ingest)",
+      "Bash(mkdir -p /Users/pl2mac0030/researchmind/frontend/modules/i18n)",
+      "Bash(mkdir -p /Users/pl2mac0030/researchmind/frontend/modules/chat)",
+      "Bash(mkdir -p /Users/pl2mac0030/researchmind/frontend/modules/ingest)",
+      "Bash(python3)",
+      "Bash(.venv/bin/python -c \"from app.main import app; print\\('backend imports OK'\\)\")",
+      "Bash(.venv/bin/python -c ' *)",
+      "Bash(.venv/bin/python -m pytest tests/ -q --tb=short)",
+      "Bash(python -m pytest tests/ -q --tb=short)",
+      "Bash(python dev.py backend restart)"
+    ],
+    "additionalDirectories": [
+      "/Users/pl2mac0030/researchmind/backend/app/services/stores"
+    ]
+  }
+}
