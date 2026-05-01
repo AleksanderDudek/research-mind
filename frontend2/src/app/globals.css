@@ -1,62 +1,87 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "tw-animate-css";
 
-/* ── shadcn/ui CSS variables (HSL format required by shadcn components) ──── */
+/* ── shadcn/ui CSS variables (HSL source values) ────────────────────────── */
 @layer base {
   :root {
-    --background:         210 40% 98%;   /* slate-50  */
-    --foreground:         222 47% 11%;   /* slate-900 */
+    --background:         210 40% 98%;
+    --foreground:         222 47% 11%;
     --card:               0 0% 100%;
     --card-foreground:    222 47% 11%;
     --popover:            0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --primary:            239 84% 67%;   /* indigo-500 */
+    --primary:            239 84% 67%;
     --primary-foreground: 0 0% 100%;
-    --secondary:          210 40% 96%;   /* slate-100 */
+    --secondary:          210 40% 96%;
     --secondary-foreground: 222 47% 11%;
     --muted:              210 40% 96%;
-    --muted-foreground:   215 16% 47%;   /* slate-500 */
-    --accent:             226 100% 97%;  /* indigo-50 */
-    --accent-foreground:  239 68% 49%;   /* indigo-700 */
+    --muted-foreground:   215 16% 47%;
+    --accent:             226 100% 97%;
+    --accent-foreground:  239 68% 49%;
     --destructive:        0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border:             213 27% 84%;   /* slate-200 */
+    --border:             213 27% 84%;
     --input:              213 27% 84%;
     --ring:               239 84% 67%;
     --radius:             0.5rem;
+
+    /* Layout helpers */
+    --sidebar-w:  260px;
+    --max-content: 720px;
   }
 }
 
-/* ── Custom design tokens (used across components) ───────────────────────── */
-:root {
-  /* Brand */
-  --color-brand:        #4F46E5;
-  --color-brand-hover:  #4338CA;
-  --color-brand-light:  #EEF2FF;
-  --color-brand-dark:   #3730A3;
+/* ── Tailwind v4 theme (generates utility classes) ───────────────────────── */
+@theme inline {
+  /* Semantic colors — mapped from HSL variables above */
+  --color-background:         hsl(var(--background));
+  --color-foreground:         hsl(var(--foreground));
+  --color-border:             hsl(var(--border));
+  --color-input:              hsl(var(--input));
+  --color-ring:               hsl(var(--ring));
+  --color-primary:            hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary:          hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-destructive:        hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-muted:              hsl(var(--muted));
+  --color-muted-foreground:   hsl(var(--muted-foreground));
+  --color-accent:             hsl(var(--accent));
+  --color-accent-foreground:  hsl(var(--accent-foreground));
+  --color-popover:            hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-card:               hsl(var(--card));
+  --color-card-foreground:    hsl(var(--card-foreground));
 
-  /* Surfaces */
-  --color-bg:           #F8FAFC;
-  --color-surface:      #FFFFFF;
-  --color-surface-2:    #F1F5F9;
-  --color-border:       #E2E8F0;
-  --color-border-focus: #A5B4FC;
-  --color-muted:        #94A3B8;
-  --color-text:         #0F172A;
-  --color-text-muted:   #64748B;
+  /* Border radius */
+  --radius-lg:   var(--radius);
+  --radius-md:   calc(var(--radius) - 2px);
+  --radius-sm:   calc(var(--radius) - 4px);
+  --radius-xl:   1rem;
+  --radius-2xl:  1.25rem;
 
-  /* Semantic */
-  --color-success:      #16A34A;
-  --color-error:        #DC2626;
-  --color-warning:      #D97706;
+  /* Typography */
+  --font-family-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-family-mono: var(--font-geist-mono), monospace;
 
   /* Layout */
-  --sidebar-w:          260px;
-  --ease:               cubic-bezier(.4, 0, .2, 1);
+  --width-sidebar:    260px;
+  --max-width-content: 720px;
+
+  /* Animations (from tw-animate-css) */
+  --animate-slide-up: slide-up 0.2s ease-out;
+
+  @keyframes slide-up {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
 }
 
-/* ── Base ────────────────────────────────────────────────────────────────── */
+/* ── Typography plugin ───────────────────────────────────────────────────── */
+@plugin "@tailwindcss/typography";
+
+/* ── Base resets ─────────────────────────────────────────────────────────── */
 @layer base {
   *, *::before, *::after { box-sizing: border-box; }
 
@@ -67,7 +92,8 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    background-color: hsl(var(--background));
+    color:            hsl(var(--foreground));
     line-height: 1.6;
     min-height: 100dvh;
   }
@@ -77,31 +103,30 @@
   ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 9999px; }
   ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }
 
-  :focus-visible {
-    outline: 2px solid hsl(var(--ring));
-    outline-offset: 2px;
-  }
+  :focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
 }
 
 /* ── Prose (markdown messages) ───────────────────────────────────────────── */
 @layer components {
   .rm-prose {
     @apply prose prose-sm max-w-none;
-    --tw-prose-body:       theme(colors.slate.800);
-    --tw-prose-headings:   theme(colors.slate.900);
-    --tw-prose-code:       theme(colors.indigo.700);
-    --tw-prose-pre-bg:     theme(colors.slate.100);
-    --tw-prose-links:      theme(colors.indigo.600);
-    --tw-prose-bullets:    theme(colors.slate.400);
-    --tw-prose-hr:         theme(colors.slate.200);
-    --tw-prose-th-borders: theme(colors.slate.300);
-    --tw-prose-td-borders: theme(colors.slate.200);
+    --tw-prose-body:       theme(--color-foreground);
+    --tw-prose-headings:   theme(--color-foreground);
+    --tw-prose-code:       #4338CA;
+    --tw-prose-pre-bg:     #F1F5F9;
+    --tw-prose-links:      #4F46E5;
+    --tw-prose-bullets:    #94A3B8;
+    --tw-prose-hr:         #E2E8F0;
+    --tw-prose-th-borders: #CBD5E1;
+    --tw-prose-td-borders: #E2E8F0;
   }
 
   .rm-prose code {
-    @apply bg-indigo-50 text-indigo-700 rounded px-1 py-0.5 text-[0.8em] font-medium;
+    @apply rounded px-1 py-0.5 text-[0.8em] font-medium;
+    background: #EEF2FF;
+    color: #4338CA;
   }
 
-  .rm-prose pre code { @apply bg-transparent text-slate-200 p-0; }
-  .rm-prose pre { @apply bg-slate-800 text-slate-200 rounded-xl overflow-x-auto; }
+  .rm-prose pre code { background: transparent; color: #E2E8F0; padding: 0; }
+  .rm-prose pre { @apply rounded-xl overflow-x-auto; background: #1E293B; color: #E2E8F0; }
 }
