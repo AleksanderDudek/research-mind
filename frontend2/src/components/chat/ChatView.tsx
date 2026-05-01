@@ -27,17 +27,21 @@ export function ChatView({ onVoiceOpen }: Props) {
   const bottomRef    = useRef<HTMLDivElement>(null)
   const abortRef     = useRef<AbortController | null>(null)
 
-  // loading  = request in flight (shows stop button)
-  // thinking = waiting for first token (shows typing indicator)
   const [loading,  setLoading]  = useState(false)
   const [thinking, setThinking] = useState(false)
 
-  const { isLoading: histLoading } = useQuery({
+  const { data: histMsgs = [], isLoading: histLoading } = useQuery({
     queryKey: ['messages', ctx.context_id],
     queryFn:  () => msgsApi.list(ctx.context_id),
     staleTime: Infinity,
-    select:    data => { setMsgs(data); return data },
   })
+
+  // Sync fetched history to the store once per data change.
+  // Must NOT be inside `select` — a new arrow function on every render causes
+  // TanStack Query to call setMsgs on every re-render, wiping appendMsg additions.
+  useEffect(() => {
+    setMsgs(histMsgs)
+  }, [histMsgs, setMsgs])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -47,33 +51,14 @@ export function ChatView({ onVoiceOpen }: Props) {
     mutationFn: (msg: Omit<Message, 'timestamp'>) => msgsApi.save(ctx.context_id, msg),
   })
 
-  const handleSubmit = async (text: string) => {
-    if (loading) return
-
-    const userTs = new Date().toISOString()
-    appendMsg({ role: 'user', content: text, timestamp: userTs })
-    // Persist user message immediately — don't wait for stream done
-    persist.mutate({ role: 'user', content: text })
-
-    setLoading(true)
-    setThinking(true)
-
-    const ctrl = new AbortController()
-    abortRef.current = ctrl
-
-    // Placeholder assistant bubble — fills in as tokens arrive
-    const ts = new Date().toISOString()
-    appendMsg({ role: 'assistant', content: '', timestamp: ts })
-
+  // Returns true = placeholder has content (keep it), false = empty (caller removes it).
+  // Tries streaming first; falls back to the non-streaming endpoint on any non-abort error.
+  const _ask = async (text: string, ts: string, signal: AbortSignal): Promise<boolean> => {
     let hasContent = false
-
     try {
-      for await (const ev of queryApi.streamAsk(text, ctx.context_id, ctrl.signal)) {
+      for await (const ev of queryApi.streamAsk(text, ctx.context_id, signal)) {
         if (ev.type === 'chunk') {
-          if (!hasContent) {
-            hasContent = true
-            setThinking(false)   // first token — hide typing indicator
-          }
+          if (!hasContent) { hasContent = true; setThinking(false) }
           updateMsg(ts, m => ({ ...m, content: m.content + ev.text }))
         } else if (ev.type === 'done') {
           updateMsg(ts, m => ({ ...m, sources: ev.sources, action_taken: ev.action_taken }))
@@ -81,32 +66,42 @@ export function ChatView({ onVoiceOpen }: Props) {
             sources: ev.sources, action_taken: ev.action_taken })
         }
       }
+      return true
     } catch (e) {
-      if ((e as Error).name === 'AbortError') {
-        if (!hasContent) removeMsg(ts)
-      } else {
-        // Streaming not available (e.g. backend not yet redeployed) — fall back to
-        // the non-streaming endpoint so the user still gets an answer.
-        try {
-          setThinking(true)
-          const res = await queryApi.ask(text, ctx.context_id, ctrl.signal)
-          updateMsg(ts, m => ({
-            ...m,
-            content:      res.answer,
-            sources:      res.sources,
-            action_taken: res.action_taken,
-          }))
-          persist.mutate({ role: 'assistant', content: res.answer,
-            sources: res.sources, action_taken: res.action_taken })
-        } catch (fallbackErr) {
-          if ((fallbackErr as Error).name !== 'AbortError') {
-            updateMsg(ts, m => ({ ...m, content: `⚠️ ${String(fallbackErr)}` }))
-          } else if (!hasContent) {
-            removeMsg(ts)
-          }
-        }
+      if ((e as Error).name === 'AbortError') return hasContent
+      // Streaming endpoint not available — fall back to blocking ask
+      setThinking(true)
+      const res = await queryApi.ask(text, ctx.context_id, signal)
+      updateMsg(ts, m => ({ ...m, content: res.answer, sources: res.sources, action_taken: res.action_taken }))
+      persist.mutate({ role: 'assistant', content: res.answer,
+        sources: res.sources, action_taken: res.action_taken })
+      return true
+    }
+  }
+
+  const handleSubmit = async (text: string) => {
+    if (loading) return
+
+    appendMsg({ role: 'user', content: text, timestamp: new Date().toISOString() })
+    persist.mutate({ role: 'user', content: text })
+    setLoading(true)
+    setThinking(true)
+
+    const ctrl = new AbortController()
+    abortRef.current = ctrl
+    const ts = new Date().toISOString()
+    appendMsg({ role: 'assistant', content: '', timestamp: ts })
+
+    let keepPlaceholder = false
+    try {
+      keepPlaceholder = await _ask(text, ts, ctrl.signal)
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') {
+        updateMsg(ts, m => ({ ...m, content: `⚠️ ${String(e)}` }))
+        keepPlaceholder = true
       }
     } finally {
+      if (!keepPlaceholder) removeMsg(ts)
       setLoading(false)
       setThinking(false)
       abortRef.current = null
@@ -138,9 +133,7 @@ export function ChatView({ onVoiceOpen }: Props) {
           {!histLoading && msgs.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full py-20 gap-3 text-center">
               <div className="text-4xl">💬</div>
-              <p className="text-sm text-slate-400 max-w-xs">
-                {t('chatEmptyHint')}
-              </p>
+              <p className="text-sm text-slate-400 max-w-xs">{t('chatEmptyHint')}</p>
             </div>
           )}
 
@@ -150,7 +143,6 @@ export function ChatView({ onVoiceOpen }: Props) {
             </AnimatePresence>
           )}
 
-          {/* Show typing indicator only before first token arrives */}
           {thinking && <TypingIndicator />}
           <div ref={bottomRef} />
         </div>
