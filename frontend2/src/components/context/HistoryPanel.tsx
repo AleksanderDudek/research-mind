@@ -25,7 +25,7 @@ export function HistoryPanel() {
   return (
     <ScrollArea className="h-full">
       <div className="px-5 py-5">
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Activity log</p>
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">{t('activityLog')}</p>
 
         {isLoading && (
           <div className="space-y-2">

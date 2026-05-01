@@ -5,6 +5,7 @@ import { useDropzone } from 'react-dropzone'
 import { Mic, MicOff, Play, Trash2, Upload, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useRecorder } from '@/hooks/useRecorder'
+import { useT } from '@/i18n/config'
 import { Button } from '@/components/ui/Button'
 
 const MAX_RECORD_S = 5 * 60      // 5 minutes
@@ -25,6 +26,7 @@ function formatTime(seconds: number): string {
 }
 
 export function VoiceRecorderSource({ onConfirm }: Props) {
+  const t = useT()
   const [mode,      setMode]      = useState<Mode>('record')
   const [blob,      setBlob]      = useState<Blob | null>(null)
   const [filename,  setFilename]  = useState('recording.webm')
@@ -55,8 +57,9 @@ export function VoiceRecorderSource({ onConfirm }: Props) {
           return s + 1
         })
       }, 1000)
-    } else {
-      if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
+    } else if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rec.recording])
@@ -96,14 +99,14 @@ export function VoiceRecorderSource({ onConfirm }: Props) {
     URL.revokeObjectURL(url)
 
     if (audio.duration && audio.duration > MAX_UPLOAD_S) {
-      setError(`File is ${Math.ceil(audio.duration / 60)} min — max upload is 30 min.`)
+      setError(t('uploadSizeError', { n: Math.ceil(audio.duration / 60), max: MAX_UPLOAD_S / 60 }))
       return
     }
 
     setFilename(file.name)
     const buf = await file.arrayBuffer()
     setBlob(new Blob([buf], { type: file.type }))
-  }, [])
+  }, [t])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -119,8 +122,10 @@ export function VoiceRecorderSource({ onConfirm }: Props) {
     setError(null)
   }
 
-  const isNearLimit = elapsed >= WARN_AT_S
-  const remaining   = MAX_RECORD_S - elapsed
+  const isNearLimit      = elapsed >= WARN_AT_S
+  const remaining        = MAX_RECORD_S - elapsed
+  const activeBorder     = isNearLimit ? 'border-red-400' : 'border-brand'
+  const recordBorder     = rec.recording ? activeBorder : 'border-border'
 
   return (
     <div className="space-y-4">
@@ -137,7 +142,7 @@ export function VoiceRecorderSource({ onConfirm }: Props) {
             )}
           >
             {m === 'record' ? <Mic size={14} /> : <Upload size={14} />}
-            {m === 'record' ? 'Record live' : 'Upload file'}
+            {m === 'record' ? t('recordLive') : t('uploadFile')}
           </button>
         ))}
       </div>
@@ -148,9 +153,7 @@ export function VoiceRecorderSource({ onConfirm }: Props) {
           {/* Timer ring */}
           <div className={cn(
             'relative w-24 h-24 rounded-full border-4 flex items-center justify-center transition-colors',
-            rec.recording
-              ? isNearLimit ? 'border-red-400' : 'border-brand'
-              : 'border-border',
+            recordBorder,
           )}>
             {/* Volume fill */}
             {rec.recording && (
@@ -166,21 +169,21 @@ export function VoiceRecorderSource({ onConfirm }: Props) {
 
           {isNearLimit && rec.recording && (
             <p className="text-xs text-red-500 font-medium">
-              {formatTime(remaining)} remaining
+              {t('timeRemaining', { t: formatTime(remaining) })}
             </p>
           )}
 
-          {!rec.recording ? (
-            <Button variant="primary" onClick={handleStartRecord} className="gap-2">
-              <Mic size={15} /> Start recording
-            </Button>
-          ) : (
+          {rec.recording ? (
             <Button variant="danger" onClick={handleStopRecord} className="gap-2">
               <MicOff size={15} /> Stop · {formatTime(elapsed)}
             </Button>
+          ) : (
+            <Button variant="primary" onClick={handleStartRecord} className="gap-2">
+              <Mic size={15} /> {t('startRecording')}
+            </Button>
           )}
 
-          <p className="text-xs text-slate-400">Max {MAX_RECORD_S / 60} minutes</p>
+          <p className="text-xs text-slate-400">{t('maxDuration', { n: MAX_RECORD_S / 60 })}</p>
         </div>
       )}
 
@@ -195,8 +198,8 @@ export function VoiceRecorderSource({ onConfirm }: Props) {
         >
           <input {...getInputProps()} />
           <Upload size={24} className={isDragActive ? 'text-brand' : 'text-slate-300'} />
-          <span>Drop an audio file or click to browse</span>
-          <span className="text-xs text-slate-400">MP3, WAV, M4A, OGG, FLAC, WebM · max 30 min</span>
+          <span>{t('dropAudio')}</span>
+          <span className="text-xs text-slate-400">{t('audioFormats')}</span>
         </div>
       )}
 
@@ -220,9 +223,9 @@ export function VoiceRecorderSource({ onConfirm }: Props) {
               className="flex-1 gap-1.5"
               onClick={() => onConfirm(blob, filename)}
             >
-              <Play size={14} /> Transcribe &amp; add as source
+              <Play size={14} /> {t('transcribeAndAdd')}
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleDiscard} title="Discard">
+            <Button variant="ghost" size="icon" onClick={handleDiscard} title={t('discard')}>
               <Trash2 size={15} className="text-slate-400" />
             </Button>
           </div>

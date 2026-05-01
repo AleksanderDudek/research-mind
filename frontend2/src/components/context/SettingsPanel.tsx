@@ -23,13 +23,13 @@ export function SettingsPanel() {
 
   const rename = useMutation({
     mutationFn: () => ctxApi.rename(ctx.context_id, name.trim()),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: ['contexts'] }); toast.success('Renamed') },
+    onSuccess:  () => { qc.invalidateQueries({ queryKey: ['contexts'] }); toast.success(t('renamedOk')) },
     onError:    (e) => toast.error(String(e)),
   })
 
   const del = useMutation({
     mutationFn: () => ctxApi.delete(ctx.context_id),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: ['contexts'] }); setActive(null); toast.success('Context deleted') },
+    onSuccess:  () => { qc.invalidateQueries({ queryKey: ['contexts'] }); setActive(null); toast.success(t('contextDeleted')) },
     onError:    (e) => toast.error(String(e)),
   })
 
@@ -37,13 +37,13 @@ export function SettingsPanel() {
     <div className="px-5 py-5 space-y-8 max-w-sm">
       {/* Voice settings */}
       <section>
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Voice</p>
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">{t('voiceSection')}</p>
         <div className="flex items-center justify-between rounded-xl border border-border bg-surface p-4">
           <div className="flex items-center gap-3">
             {ttsEnabled ? <Volume2 size={18} className="text-brand" /> : <VolumeX size={18} className="text-slate-400" />}
             <div>
-              <p className="text-sm font-medium text-slate-800">Agent voice response</p>
-              <p className="text-xs text-slate-400 mt-0.5">Agent reads answers aloud in voice mode</p>
+              <p className="text-sm font-medium text-slate-800">{t('agentVoiceLabel')}</p>
+              <p className="text-xs text-slate-400 mt-0.5">{t('agentVoiceDesc')}</p>
             </div>
           </div>
           <button
@@ -60,7 +60,7 @@ export function SettingsPanel() {
 
       {/* Rename */}
       <section>
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Context name</p>
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">{t('contextNameSection')}</p>
         <div className="flex gap-2">
           <Input value={name} onChange={e => setName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { rename.mutate() } }}
@@ -74,18 +74,16 @@ export function SettingsPanel() {
 
       {/* Danger zone */}
       <section>
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Danger zone</p>
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">{t('dangerZone')}</p>
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-3">
           <div>
-            <p className="text-sm font-medium text-red-800">Delete this context</p>
-            <p className="text-xs text-red-600 mt-0.5">
-              Removes all sources, messages, and history. This action cannot be undone.
-            </p>
+            <p className="text-sm font-medium text-red-800">{t('deleteContextTitle')}</p>
+            <p className="text-xs text-red-600 mt-0.5">{t('deleteContextDesc')}</p>
           </div>
           {confirm ? (
             <div className="flex gap-2">
               <Button variant="danger" size="sm" onClick={() => del.mutate()} loading={del.isPending}>
-                <Trash2 size={13} /> Yes, delete permanently
+                <Trash2 size={13} /> {t('deletePermanently')}
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setConfirm(false)}>{t('cancel')}</Button>
             </div>

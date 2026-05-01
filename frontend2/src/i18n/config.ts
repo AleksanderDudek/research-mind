@@ -6,6 +6,7 @@ import en from './en.json'
 import pl from './pl.json'
 
 type Translations = typeof en
+export type TranslationKey = keyof Translations
 
 const TRANSLATIONS: Record<Lang, Translations> = { en, pl }
 

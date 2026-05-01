@@ -5,6 +5,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { AnimatePresence } from 'framer-motion'
 import { messages as msgsApi, query as queryApi } from '@/lib/api'
 import { useAppStore } from '@/lib/store'
+import { useT } from '@/i18n/config'
 import type { Message } from '@/lib/types'
 import { ScrollArea }      from '@/components/ui/ScrollArea'
 import { ChatMessage }     from './ChatMessage'
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export function ChatView({ onVoiceOpen }: Props) {
+  const t         = useT()
   const ctx       = useAppStore(s => s.activeContext)!
   const msgs      = useAppStore(s => s.messages)
   const setMsgs   = useAppStore(s => s.setMessages)
@@ -99,7 +101,7 @@ export function ChatView({ onVoiceOpen }: Props) {
             <div className="flex flex-col items-center justify-center h-full py-20 gap-3 text-center">
               <div className="text-4xl">💬</div>
               <p className="text-sm text-slate-400 max-w-xs">
-                Ask anything about the sources in this context — research papers, documents, or notes.
+                {t('chatEmptyHint')}
               </p>
             </div>
           )}

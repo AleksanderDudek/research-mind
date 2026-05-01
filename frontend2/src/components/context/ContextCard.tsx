@@ -33,13 +33,13 @@ export function ContextCard({ ctx, onOpen }: Props) {
 
   const del = useMutation({
     mutationFn: () => api.delete(ctx.context_id),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: ['contexts'] }); toast.success('Context deleted') },
+    onSuccess:  () => { qc.invalidateQueries({ queryKey: ['contexts'] }); toast.success(t('contextDeleted')) },
     onError:    (e) => toast.error(String(e)),
   })
 
   const rename = useMutation({
     mutationFn: () => api.rename(ctx.context_id, newName.trim()),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: ['contexts'] }); setRenaming(false); toast.success('Renamed') },
+    onSuccess:  () => { qc.invalidateQueries({ queryKey: ['contexts'] }); setRenaming(false); toast.success(t('renamedOk')) },
     onError:    (e) => toast.error(String(e)),
   })
 
@@ -81,7 +81,7 @@ export function ContextCard({ ctx, onOpen }: Props) {
             <p className="font-semibold text-slate-800 truncate leading-tight">{ctx.name}</p>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-xs text-slate-400">{date}</span>
-              <Badge size="sm">{srcs.length} {srcs.length === 1 ? 'source' : 'sources'}</Badge>
+              <Badge size="sm">{t('sourcesCount', { n: srcs.length })}</Badge>
             </div>
           </button>
 
@@ -93,7 +93,7 @@ export function ContextCard({ ctx, onOpen }: Props) {
 
             <Popover>
               <PopoverTrigger asChild>
-                <Button size="icon-sm" variant="ghost" title="More options">
+                <Button size="icon-sm" variant="ghost" title={t('moreOptions')}>
                   <MoreHorizontal size={15} />
                 </Button>
               </PopoverTrigger>

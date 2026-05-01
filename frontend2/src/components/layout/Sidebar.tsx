@@ -3,6 +3,7 @@
 import { MessageSquare, FileText, History, Settings, Languages } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useT, useLang } from '@/i18n/config'
+import type { TranslationKey } from '@/i18n/config'
 import type { Context } from '@/lib/types'
 
 export type SidebarTab = 'chat' | 'sources' | 'history' | 'settings'
@@ -15,11 +16,11 @@ interface Props {
   readonly onBack:      () => void
 }
 
-const NAV: { id: SidebarTab; Icon: typeof MessageSquare; label: string; badge?: (n: number) => string }[] = [
-  { id: 'chat',     Icon: MessageSquare, label: 'Chat'    },
-  { id: 'sources',  Icon: FileText,      label: 'Sources', badge: String },
-  { id: 'history',  Icon: History,       label: 'History' },
-  { id: 'settings', Icon: Settings,      label: 'Settings'},
+const NAV: { id: SidebarTab; Icon: typeof MessageSquare; labelKey: TranslationKey; badge?: (n: number) => string }[] = [
+  { id: 'chat',     Icon: MessageSquare, labelKey: 'chat'    },
+  { id: 'sources',  Icon: FileText,      labelKey: 'sources', badge: String },
+  { id: 'history',  Icon: History,       labelKey: 'history' },
+  { id: 'settings', Icon: Settings,      labelKey: 'settings'},
 ]
 
 export function Sidebar({ ctx, tab, sourceCount, onTab, onBack }: Props) {
@@ -42,7 +43,7 @@ export function Sidebar({ ctx, tab, sourceCount, onTab, onBack }: Props) {
 
       {/* Nav */}
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-        {NAV.map(({ id, Icon, label, badge }) => (
+        {NAV.map(({ id, Icon, labelKey, badge }) => (
           <button
             key={id}
             type="button"
@@ -55,7 +56,7 @@ export function Sidebar({ ctx, tab, sourceCount, onTab, onBack }: Props) {
             )}
           >
             <Icon size={16} className="shrink-0" />
-            <span className="flex-1">{label}</span>
+            <span className="flex-1">{t(labelKey)}</span>
             {badge && sourceCount > 0 && (
               <span className="text-xs bg-brand-light text-brand rounded-full px-1.5 py-0.5 leading-none">
                 {badge(sourceCount)}

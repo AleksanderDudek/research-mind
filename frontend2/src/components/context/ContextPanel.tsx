@@ -63,7 +63,7 @@ export function ContextPanel() {
         {/* Create context */}
         <section>
           <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">
-            New context
+            {t('newContextSection')}
           </h2>
           <div className="flex gap-2">
             <Input
@@ -88,7 +88,7 @@ export function ContextPanel() {
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
-              Recent contexts
+              {t('recentContexts')}
             </h2>
             {sorted.length > 4 && (
               <div className="relative w-44">
@@ -96,7 +96,7 @@ export function ContextPanel() {
                 <input
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  placeholder="Filter…"
+                  placeholder={t('filterPlaceholder')}
                   className="w-full rounded-lg border border-border bg-surface-2 pl-7 pr-3 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-brand/60"
                 />
               </div>
@@ -110,7 +110,7 @@ export function ContextPanel() {
               ))}
             </div>
           ) : filtered.length === 0 && search ? (
-            <p className="text-sm text-slate-400 py-8 text-center">No contexts match &quot;{search}&quot;</p>
+            <p className="text-sm text-slate-400 py-8 text-center">{t('noContextsMatch', { search })}</p>
           ) : filtered.length === 0 ? (
             <EmptyState />
           ) : (

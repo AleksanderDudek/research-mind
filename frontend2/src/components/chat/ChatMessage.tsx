@@ -7,10 +7,12 @@ import remarkGfm from 'remark-gfm'
 import { ChevronDown, ChevronUp, BookOpen, Bot } from 'lucide-react'
 import type { Message } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { useT } from '@/i18n/config'
 
 interface Props { readonly msg: Message }
 
 export function ChatMessage({ msg }: Props) {
+  const t = useT()
   const [showSrc, setShowSrc] = useState(false)
   const isUser = msg.role === 'user'
 
@@ -51,7 +53,7 @@ export function ChatMessage({ msg }: Props) {
                   onClick={() => setShowSrc(v => !v)}
                 >
                   <BookOpen size={12} />
-                  {msg.sources.length} source{msg.sources.length !== 1 && 's'}
+                  {t('sourcesCount', { n: msg.sources.length })}
                   {showSrc ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                 </button>
                 {showSrc && (
@@ -73,7 +75,7 @@ export function ChatMessage({ msg }: Props) {
             {(msg.action_taken || msg.iterations) && (
               <details className="mt-2">
                 <summary className="text-[11px] text-slate-400 cursor-pointer select-none hover:text-slate-500">
-                  Details
+                  {t('messageDetails')}
                 </summary>
                 <p className="text-[11px] text-slate-400 mt-1">
                   {msg.action_taken && <>Action: {msg.action_taken}</>}

@@ -10,7 +10,7 @@ export function EmptyState() {
       </div>
       <div>
         <p className="font-semibold text-slate-800 mb-1">{t('noContexts')}</p>
-        <p className="text-sm text-slate-500">Type a name above and press Create to get started.</p>
+        <p className="text-sm text-slate-500">{t('emptyContextHint')}</p>
       </div>
     </div>
   )

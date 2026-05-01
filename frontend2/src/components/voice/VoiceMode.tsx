@@ -14,16 +14,9 @@ import { ChatMessage }    from '@/components/chat/ChatMessage'
 import { TypingIndicator } from '@/components/chat/TypingIndicator'
 import { VoiceCircle }    from './VoiceCircle'
 import type { Message }   from '@/lib/types'
+import type { LoopState } from '@/hooks/useVoiceLoop'
 
 interface Props { readonly onClose: () => void }
-
-const STATUS_LABEL: Record<string, string> = {
-  idle:         'Ready',
-  recording:    'Listening…',
-  transcribing: 'Transcribing…',
-  thinking:     'Thinking…',
-  speaking:     'Speaking…',
-}
 
 export function VoiceMode({ onClose }: Props) {
   const t           = useT()
@@ -69,6 +62,14 @@ export function VoiceMode({ onClose }: Props) {
     if (!next) globalThis.speechSynthesis?.cancel()
   }
 
+  const STATUS_LABEL: Record<LoopState, string> = {
+    idle:         t('statusReady'),
+    recording:    t('statusListening'),
+    transcribing: t('statusTranscribing'),
+    thinking:     t('statusThinking'),
+    speaking:     t('statusSpeaking'),
+  }
+
   return (
     <motion.div
       key="voice-overlay"
@@ -82,10 +83,10 @@ export function VoiceMode({ onClose }: Props) {
         <p className="font-semibold text-slate-800 text-sm">🗣️ {t('voiceMode')}</p>
         <div className="flex items-center gap-1">
           <Button size="icon" variant="ghost" onClick={handleTtsToggle}
-            title={ttsEnabled ? 'Mute responses' : 'Unmute responses'}>
+            title={ttsEnabled ? t('muteResponses') : t('unmuteResponses')}>
             {ttsEnabled ? <Volume2 size={16} /> : <VolumeX size={16} className="text-slate-400" />}
           </Button>
-          <Button size="icon" variant="ghost" onClick={handleClose} title="Close voice mode">
+          <Button size="icon" variant="ghost" onClick={handleClose} title={t('closeVoiceMode')}>
             <X size={18} />
           </Button>
         </div>
@@ -96,7 +97,7 @@ export function VoiceMode({ onClose }: Props) {
         <div className="px-4 py-4 space-y-3">
           {msgs.length === 0 ? (
             <p className="text-center text-sm text-slate-400 py-8">
-              Voice mode is active — start speaking.
+              {t('voiceActiveHint')}
             </p>
           ) : (
             msgs.map(m => <ChatMessage key={`${m.role}-${m.timestamp}`} msg={m} />)
@@ -111,7 +112,7 @@ export function VoiceMode({ onClose }: Props) {
         <VoiceCircle state={state} rms={rms} />
 
         <p className="text-sm font-medium text-slate-600">
-          {STATUS_LABEL[state] ?? 'Ready'}
+          {STATUS_LABEL[state] ?? t('statusReady')}
         </p>
 
         {/* Volume bar — visible while recording */}
@@ -130,7 +131,7 @@ export function VoiceMode({ onClose }: Props) {
           {state === 'thinking' && (
             <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
               <Button variant="danger" onClick={interrupt} className="gap-2">
-                <StopCircle size={15} /> Interrupt
+                <StopCircle size={15} /> {t('interrupt')}
               </Button>
             </motion.div>
           )}
@@ -143,7 +144,7 @@ export function VoiceMode({ onClose }: Props) {
           className="flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-1.5 text-sm font-medium text-slate-600 hover:border-brand hover:text-brand transition-colors"
         >
           {ttsEnabled ? <Volume2 size={15} /> : <VolumeX size={15} className="text-slate-400" />}
-          {ttsEnabled ? 'Voice ON' : 'Voice OFF'}
+          {ttsEnabled ? t('voiceOnLabel') : t('voiceOffLabel')}
         </button>
 
         <Button variant="ghost" size="sm" onClick={handleClose}>

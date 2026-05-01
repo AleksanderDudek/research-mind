@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Trash2, FileText, Globe, Upload, Type, Image, Mic2, HelpCircle, Mic } from 'lucide-react'
 import { ingest as ingestApi, sources as srcApi } from '@/lib/api'
 import { useT } from '@/i18n/config'
+import type { TranslationKey } from '@/i18n/config'
 import { useAppStore } from '@/lib/store'
 import type { Source } from '@/lib/types'
 import { Button } from '@/components/ui/Button'
@@ -21,18 +22,18 @@ type SourceType = 'pdfUrl' | 'webUrl' | 'upload' | 'text' | 'image' | 'audio' | 
 interface TabDef {
   readonly key:      SourceType
   readonly Icon:     typeof FileText
-  readonly labelKey: string
-  readonly helpKey:  string
+  readonly labelKey: TranslationKey
+  readonly helpKey:  TranslationKey
 }
 
 const TABS: TabDef[] = [
-  { key: 'pdfUrl', Icon: FileText, labelKey: 'tabPdfUrl', helpKey: 'Fetch a PDF from a URL and index its content.' },
-  { key: 'webUrl', Icon: Globe,    labelKey: 'tabWeb',    helpKey: 'Fetch a web page and index its main content.' },
-  { key: 'upload', Icon: Upload,   labelKey: 'tabUpload', helpKey: 'Upload a PDF file from your device.' },
-  { key: 'text',   Icon: Type,     labelKey: 'tabText',   helpKey: 'Paste any text — notes, excerpts, summaries.' },
-  { key: 'image',  Icon: Image,    labelKey: 'tabImage',  helpKey: 'Upload an image. A vision model will describe it and index the description.' },
-  { key: 'audio',  Icon: Mic2,     labelKey: 'tabAudio',  helpKey: 'Upload an audio file. Whisper will transcribe it.' },
-  { key: 'record', Icon: Mic,      labelKey: 'tabRecord', helpKey: 'Record audio live (max 5 min) or upload a file (max 30 min). Preview before transcription.' },
+  { key: 'pdfUrl', Icon: FileText, labelKey: 'tabPdfUrl', helpKey: 'helpPdfUrl' },
+  { key: 'webUrl', Icon: Globe,    labelKey: 'tabWeb',    helpKey: 'helpWebUrl' },
+  { key: 'upload', Icon: Upload,   labelKey: 'tabUpload', helpKey: 'helpUpload' },
+  { key: 'text',   Icon: Type,     labelKey: 'tabText',   helpKey: 'helpText'   },
+  { key: 'image',  Icon: Image,    labelKey: 'tabImage',  helpKey: 'helpImage'  },
+  { key: 'audio',  Icon: Mic2,     labelKey: 'tabAudio',  helpKey: 'helpAudio'  },
+  { key: 'record', Icon: Mic,      labelKey: 'tabRecord', helpKey: 'helpRecord' },
 ]
 
 function DropZone({
@@ -78,7 +79,7 @@ export function IngestPanel() {
   const mut = useMutation({
     mutationFn: (fn: () => Promise<{ chunks_ingested: number }>) => fn(),
     onSuccess: (res) => {
-      toast.success(`Indexed ${res.chunks_ingested} chunk${res.chunks_ingested !== 1 ? 's' : ''}`)
+      toast.success(t('ingestOk', { n: res.chunks_ingested }))
       setUrl(''); setTitle(''); setTextBody(''); setFile(null)
       invalidate()
     },
@@ -98,7 +99,7 @@ export function IngestPanel() {
 
   const delSrc = useMutation({
     mutationFn: (docId: string) => srcApi.delete(ctx.context_id, docId),
-    onSuccess:  () => { toast.success('Source removed'); invalidate() },
+    onSuccess:  () => { toast.success(t('sourceRemoved')); invalidate() },
     onError:    (e) => toast.error(String(e)),
   })
 
@@ -116,14 +117,14 @@ export function IngestPanel() {
     isFieldEmpty = file === null
   }
 
-  const currentTab = TABS.find(t => t.key === tab)!
+  const currentTab = TABS.find(tb => tb.key === tab)!
 
   return (
     <ScrollArea className="h-full">
       <div className="px-5 py-5 space-y-6">
         {/* Source type selector */}
         <div>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Source type</p>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">{t('sourceTypeSection')}</p>
           <div className="grid grid-cols-3 gap-1.5">
             {TABS.map(({ key, Icon, labelKey }) => (
               <button
@@ -138,7 +139,7 @@ export function IngestPanel() {
                 )}
               >
                 <Icon size={16} />
-                {t(labelKey as never)}
+                {t(labelKey)}
               </button>
             ))}
           </div>
@@ -146,7 +147,7 @@ export function IngestPanel() {
           {/* Contextual help */}
           <p className="flex items-start gap-1.5 text-xs text-slate-400 mt-2.5">
             <HelpCircle size={12} className="shrink-0 mt-0.5" />
-            {currentTab.helpKey}
+            {t(currentTab.helpKey)}
           </p>
         </div>
 
@@ -177,12 +178,12 @@ export function IngestPanel() {
           )}
 
           {tab === 'upload' && (
-            <DropZone accept={{ 'application/pdf': ['.pdf'] }} label="Drop a PDF or click to browse" onFile={setFile} />
+            <DropZone accept={{ 'application/pdf': ['.pdf'] }} label={t('dropPdf')} onFile={setFile} />
           )}
 
           {tab === 'image' && (
             <>
-              <DropZone accept={{ 'image/*': ['.png','.jpg','.jpeg','.webp'] }} label="Drop an image or click to browse" onFile={setFile} />
+              <DropZone accept={{ 'image/*': ['.png','.jpg','.jpeg','.webp'] }} label={t('dropImage')} onFile={setFile} />
               <div className="flex gap-2">
                 {(['quick', 'standard', 'detailed'] as const).map(d => (
                   <button
@@ -203,7 +204,7 @@ export function IngestPanel() {
 
           {tab === 'audio' && (
             <>
-              <DropZone accept={{ 'audio/*': ['.mp3','.wav','.m4a','.ogg','.flac','.webm'] }} label="Drop an audio file or click to browse" onFile={setFile} />
+              <DropZone accept={{ 'audio/*': ['.mp3','.wav','.m4a','.ogg','.flac','.webm'] }} label={t('dropAudio')} onFile={setFile} />
               <p className="text-xs text-slate-400">{t('audioHint')}</p>
             </>
           )}
@@ -229,14 +230,14 @@ export function IngestPanel() {
         {/* Indexed sources */}
         <div>
           <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-            Indexed sources
+            {t('indexedSources')}
             {sourceList.length > 0 && <Badge size="sm">{sourceList.length}</Badge>}
           </p>
 
           {isLoading && <div className="space-y-2">{[1,2].map(i => <div key={i} className="h-14 rounded-xl bg-surface-2 animate-pulse" />)}</div>}
 
           {!isLoading && sourceList.length === 0 && (
-            <p className="text-sm text-slate-400 text-center py-6">No sources yet. Add one above.</p>
+            <p className="text-sm text-slate-400 text-center py-6">{t('noSourcesYet')}</p>
           )}
 
           {!isLoading && sourceList.length > 0 && (
@@ -248,7 +249,7 @@ export function IngestPanel() {
                     <p className="text-sm font-medium text-slate-800 truncate">{s.title || s.document_id.slice(0, 8)}</p>
                     <p className="text-xs text-slate-400 flex items-center gap-1.5">
                       <Badge size="sm">{s.source_type}</Badge>
-                      {s.chunk_count} chunks
+                      {t('chunksCount', { n: s.chunk_count })}
                     </p>
                   </div>
                   <Button size="icon-sm" variant="ghost" onClick={() => delSrc.mutate(s.document_id)}

@@ -2,6 +2,8 @@
 
 import { MessageSquare, FileText, History, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useT } from '@/i18n/config'
+import type { TranslationKey } from '@/i18n/config'
 import type { SidebarTab } from './Sidebar'
 
 interface Props {
@@ -9,18 +11,20 @@ interface Props {
   readonly onTab: (t: SidebarTab) => void
 }
 
-const TABS: { id: SidebarTab; Icon: typeof MessageSquare; label: string }[] = [
-  { id: 'chat',     Icon: MessageSquare, label: 'Chat'    },
-  { id: 'sources',  Icon: FileText,      label: 'Sources' },
-  { id: 'history',  Icon: History,       label: 'History' },
-  { id: 'settings', Icon: Settings,      label: 'Settings'},
+const TABS: { id: SidebarTab; Icon: typeof MessageSquare; labelKey: TranslationKey }[] = [
+  { id: 'chat',     Icon: MessageSquare, labelKey: 'chat'    },
+  { id: 'sources',  Icon: FileText,      labelKey: 'sources' },
+  { id: 'history',  Icon: History,       labelKey: 'history' },
+  { id: 'settings', Icon: Settings,      labelKey: 'settings'},
 ]
 
 export function BottomTabs({ tab, onTab }: Props) {
+  const t = useT()
+
   return (
     <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 border-t border-border bg-surface/95 backdrop-blur-sm">
       <div className="flex">
-        {TABS.map(({ id, Icon, label }) => (
+        {TABS.map(({ id, Icon, labelKey }) => (
           <button
             key={id}
             type="button"
@@ -31,7 +35,7 @@ export function BottomTabs({ tab, onTab }: Props) {
             )}
           >
             <Icon size={18} strokeWidth={tab === id ? 2.5 : 1.75} />
-            {label}
+            {t(labelKey)}
           </button>
         ))}
       </div>
