@@ -1,39 +1,29 @@
-'use client'
+import { NextIntlClientProvider } from 'next-intl'
+import { setRequestLocale } from 'next-intl/server'
+import { notFound } from 'next/navigation'
+import { routing } from '@/i18n/routing'
+import Providers from './providers'
 
-import { use } from 'react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Toaster } from 'sonner'
-import { TooltipProvider } from '@/components/ui/Tooltip'
-import { LangContext } from '@/i18n/config'
-import type { Lang } from '@/lib/types'
-
-const queryClient = new QueryClient({
-  defaultOptions: { queries: { staleTime: 30_000, retry: 1 } },
-})
-
-export default function LocaleLayout({
+export default async function LocaleLayout({
   children,
   params,
 }: {
   readonly children: React.ReactNode
   readonly params:   Promise<{ locale: string }>
 }) {
-  const { locale } = use(params)
-  const lang = (locale === 'pl' ? 'pl' : 'en') as Lang
+  const { locale } = await params
+  if (!(routing.locales as readonly string[]).includes(locale)) notFound()
+
+  // Required for static export — lets next-intl know the locale without
+  // reading HTTP headers (which are unavailable during static rendering).
+  setRequestLocale(locale)
+
+  // Load messages directly from params to avoid headers() calls.
+  const messages = (await import(`@/i18n/messages/${locale}.json`)).default
 
   return (
-    <LangContext.Provider value={lang}>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          {children}
-          <Toaster
-            position="bottom-center"
-            richColors
-            closeButton
-            toastOptions={{ className: 'font-sans text-sm' }}
-          />
-        </TooltipProvider>
-      </QueryClientProvider>
-    </LangContext.Provider>
+    <NextIntlClientProvider locale={locale} messages={messages}>
+      <Providers>{children}</Providers>
+    </NextIntlClientProvider>
   )
 }

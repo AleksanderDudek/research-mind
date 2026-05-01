@@ -1,9 +1,8 @@
 'use client'
 
 import { MessageSquare, FileText, History, Settings, Languages } from 'lucide-react'
+import { useTranslations, useLocale } from 'next-intl'
 import { cn } from '@/lib/utils'
-import { useT, useLang } from '@/i18n/config'
-import type { TranslationKey } from '@/i18n/config'
 import type { Context } from '@/lib/types'
 
 export type SidebarTab = 'chat' | 'sources' | 'history' | 'settings'
@@ -16,7 +15,7 @@ interface Props {
   readonly onBack:      () => void
 }
 
-const NAV: { id: SidebarTab; Icon: typeof MessageSquare; labelKey: TranslationKey; badge?: (n: number) => string }[] = [
+const NAV: { id: SidebarTab; Icon: typeof MessageSquare; labelKey: string; badge?: (n: number) => string }[] = [
   { id: 'chat',     Icon: MessageSquare, labelKey: 'chat'    },
   { id: 'sources',  Icon: FileText,      labelKey: 'sources', badge: String },
   { id: 'history',  Icon: History,       labelKey: 'history' },
@@ -24,24 +23,23 @@ const NAV: { id: SidebarTab; Icon: typeof MessageSquare; labelKey: TranslationKe
 ]
 
 export function Sidebar({ ctx, tab, sourceCount, onTab, onBack }: Props) {
-  const t    = useT()
-  const lang = useLang()
+  const t      = useTranslations()
+  const locale = useLocale()
+  const targetLocale = locale === 'en' ? 'pl' : 'en'
 
   return (
-    <aside className="hidden md:flex flex-col w-sidebar shrink-0 border-r border-border bg-surface h-dvh sticky top-0">
-      {/* Back + context name */}
-      <div className="px-4 py-4 border-b border-border">
+    <aside className="hidden md:flex flex-col w-sidebar shrink-0 border-r bg-card h-dvh sticky top-0">
+      <div className="px-4 py-4 border-b">
         <button
           type="button"
           onClick={onBack}
-          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-brand mb-3 transition-colors"
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary mb-3 transition-colors"
         >
           ← {t('back')}
         </button>
-        <p className="font-semibold text-slate-800 text-sm truncate leading-tight">{ctx.name}</p>
+        <p className="font-semibold text-sm truncate leading-tight">{ctx.name}</p>
       </div>
 
-      {/* Nav */}
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
         {NAV.map(({ id, Icon, labelKey, badge }) => (
           <button
@@ -50,15 +48,13 @@ export function Sidebar({ ctx, tab, sourceCount, onTab, onBack }: Props) {
             onClick={() => onTab(id)}
             className={cn(
               'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left',
-              tab === id
-                ? 'bg-brand-light text-brand'
-                : 'text-slate-600 hover:bg-surface-2 hover:text-slate-800',
+              tab === id ? 'bg-accent text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
             )}
           >
             <Icon size={16} className="shrink-0" />
             <span className="flex-1">{t(labelKey)}</span>
             {badge && sourceCount > 0 && (
-              <span className="text-xs bg-brand-light text-brand rounded-full px-1.5 py-0.5 leading-none">
+              <span className="text-xs bg-accent text-primary rounded-full px-1.5 py-0.5 leading-none">
                 {badge(sourceCount)}
               </span>
             )}
@@ -66,11 +62,10 @@ export function Sidebar({ ctx, tab, sourceCount, onTab, onBack }: Props) {
         ))}
       </nav>
 
-      {/* Lang toggle */}
-      <div className="px-4 py-3 border-t border-border">
+      <div className="px-4 py-3 border-t">
         <a
-          href={lang === 'en' ? '/pl' : '/en'}
-          className="flex items-center gap-2 text-xs text-slate-400 hover:text-brand transition-colors"
+          href={`/${targetLocale}`}
+          className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
         >
           <Languages size={14} />
           {t('langToggle')}

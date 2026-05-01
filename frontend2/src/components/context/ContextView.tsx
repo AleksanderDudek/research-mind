@@ -26,30 +26,19 @@ export function ContextView() {
     staleTime: 60_000,
   })
 
-  const back = () => setActive(null)
-
   return (
-    <div className="flex h-dvh overflow-hidden bg-[var(--color-bg)]">
-      {/* Desktop sidebar */}
-      <Sidebar
-        ctx={ctx}
-        tab={tab}
-        sourceCount={srcs.length}
-        onTab={setTab}
-        onBack={back}
-      />
+    <div className="flex h-dvh overflow-hidden bg-background">
+      <Sidebar ctx={ctx} tab={tab} sourceCount={srcs.length} onTab={setTab} onBack={() => setActive(null)} />
 
-      {/* Main content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden pb-14 md:pb-0">
         {/* Mobile header */}
-        <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-border bg-surface">
-          <button type="button" onClick={back} className="text-sm text-slate-500 hover:text-brand transition-colors">
+        <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b bg-card">
+          <button type="button" onClick={() => setActive(null)} className="text-sm text-muted-foreground hover:text-primary transition-colors">
             ← Back
           </button>
-          <p className="flex-1 font-semibold text-slate-800 text-sm truncate">{ctx.name}</p>
+          <p className="flex-1 font-semibold text-sm truncate">{ctx.name}</p>
         </div>
 
-        {/* Panel content */}
         <div className="flex-1 overflow-hidden">
           {tab === 'chat'     && <ChatView onVoiceOpen={() => setVoiceOn(true)} />}
           {tab === 'sources'  && <IngestPanel />}
@@ -58,10 +47,8 @@ export function ContextView() {
         </div>
       </main>
 
-      {/* Mobile bottom tabs */}
       <BottomTabs tab={tab} onTab={setTab} />
 
-      {/* Voice overlay */}
       <AnimatePresence>
         {voiceOn && <VoiceMode key="voice" onClose={() => setVoiceOn(false)} />}
       </AnimatePresence>

@@ -1,22 +1,25 @@
 'use client'
 
-import { useRef, useState, KeyboardEvent } from 'react'
+import { useRef, useState } from 'react'
+import type { KeyboardEvent } from 'react'
 import { SendHorizonal, Square, Mic, MicOff } from 'lucide-react'
-import { useT } from '@/i18n/config'
+import { useTranslations } from 'next-intl'
 import { useRecorder } from '@/hooks/useRecorder'
 import { query as queryApi } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 
 interface Props {
-  readonly onSubmit:      (text: string) => void
-  readonly loading:       boolean
-  readonly onStop:        () => void
-  readonly onVoiceOpen:   () => void
-  readonly disabled?:     boolean
+  readonly onSubmit:    (text: string) => void
+  readonly loading:     boolean
+  readonly onStop:      () => void
+  readonly onVoiceOpen: () => void
+  readonly disabled?:   boolean
 }
 
 export function ChatInput({ onSubmit, loading, onStop, onVoiceOpen, disabled }: Props) {
-  const t           = useT()
+  const t           = useTranslations()
   const [text, setText] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const rec         = useRecorder()
@@ -24,10 +27,10 @@ export function ChatInput({ onSubmit, loading, onStop, onVoiceOpen, disabled }: 
 
   const submit = () => {
     const v = text.trim()
-    if (!v || loading) { return }
+    if (!v || loading) return
     onSubmit(v)
     setText('')
-    if (textareaRef.current) { textareaRef.current.style.height = 'auto' }
+    if (textareaRef.current) textareaRef.current.style.height = 'auto'
   }
 
   const handleKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -47,9 +50,10 @@ export function ChatInput({ onSubmit, loading, onStop, onVoiceOpen, disabled }: 
       try {
         const blob = await rec.stop()
         const res  = await queryApi.transcribe(blob)
-        if (res.text) { setText(prev => prev + (prev ? ' ' : '') + res.text) }
-      } catch { /* ignore */ }
-      finally { setTranscribing(false) }
+        if (res.text) setText(prev => prev + (prev ? ' ' : '') + res.text)
+      } catch { /* ignore */ } finally {
+        setTranscribing(false)
+      }
     } else {
       await rec.start()
     }
@@ -58,39 +62,30 @@ export function ChatInput({ onSubmit, loading, onStop, onVoiceOpen, disabled }: 
   const isDisabled = disabled || loading
 
   return (
-    <div className="border-t border-border bg-surface px-3 py-3">
-      {/* Volume bar */}
+    <div className="border-t bg-card px-3 py-3">
       {rec.recording && (
-        <div className="mb-2 h-0.5 bg-slate-100 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-red-400 rounded-full transition-all duration-75"
-            style={{ width: `${rec.rms * 100}%` }}
-          />
+        <div className="mb-2 h-0.5 bg-muted rounded-full overflow-hidden">
+          <div className="h-full bg-destructive rounded-full transition-all duration-75" style={{ width: `${rec.rms * 100}%` }} />
         </div>
       )}
 
       <div className="flex items-end gap-2">
-        {/* Quick-transcribe mic */}
-        <button
+        <Button
           type="button"
+          size="icon"
+          variant="outline"
           onClick={toggleMic}
           disabled={isDisabled || transcribing}
           title={rec.recording ? 'Stop recording' : 'Transcribe (click to record)'}
           className={cn(
-            'h-9 w-9 rounded-full border flex items-center justify-center text-base shrink-0 transition-all',
-            rec.recording
-              ? 'bg-red-50 border-red-300 text-red-500 animate-pulse'
-              : 'bg-surface border-border text-slate-400 hover:border-brand hover:text-brand',
-            (isDisabled || transcribing) && 'opacity-40 pointer-events-none',
+            'h-9 w-9 shrink-0 rounded-full transition-all',
+            rec.recording && 'border-destructive text-destructive bg-destructive/10 animate-pulse',
           )}
         >
-          {transcribing && '⌛'}
-          {!transcribing && rec.recording && <MicOff size={15} />}
-          {!transcribing && !rec.recording && <Mic size={15} />}
-        </button>
+          {transcribing ? '⌛' : rec.recording ? <MicOff size={15} /> : <Mic size={15} />}
+        </Button>
 
-        {/* Textarea */}
-        <textarea
+        <Textarea
           ref={textareaRef}
           value={text}
           onChange={handleResize}
@@ -98,54 +93,42 @@ export function ChatInput({ onSubmit, loading, onStop, onVoiceOpen, disabled }: 
           placeholder={t('chatPlaceholder')}
           rows={1}
           disabled={isDisabled}
-          className={cn(
-            'flex-1 resize-none rounded-xl border border-border bg-surface-2 px-3.5 py-2.5 text-sm',
-            'placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:bg-surface',
-            'transition-colors max-h-40 overflow-auto leading-relaxed',
-            isDisabled && 'opacity-50 cursor-not-allowed',
-          )}
+          className="flex-1 resize-none max-h-40 overflow-auto leading-relaxed rounded-xl"
         />
 
-        {/* Voice mode FAB */}
-        <button
+        <Button
           type="button"
+          size="icon"
+          variant="outline"
           onClick={onVoiceOpen}
           disabled={isDisabled}
           title="Voice mode"
-          className={cn(
-            'h-9 w-9 rounded-full border border-border bg-surface text-slate-400',
-            'hover:border-brand hover:text-brand flex items-center justify-center transition-all text-base',
-            isDisabled && 'opacity-40 pointer-events-none',
-          )}
+          className="h-9 w-9 shrink-0 rounded-full"
         >
           🗣️
-        </button>
+        </Button>
 
-        {/* Send / Stop */}
         {loading ? (
-          <button
+          <Button
             type="button"
+            size="icon"
             onClick={onStop}
-            className="h-9 w-9 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors shrink-0"
+            className="h-9 w-9 shrink-0 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
             title={t('stop')}
           >
             <Square size={14} fill="currentColor" />
-          </button>
+          </Button>
         ) : (
-          <button
+          <Button
             type="button"
+            size="icon"
             onClick={submit}
             disabled={!text.trim() || isDisabled}
-            className={cn(
-              'h-9 w-9 rounded-full flex items-center justify-center transition-all shrink-0',
-              text.trim() && !isDisabled
-                ? 'bg-brand text-white hover:bg-brand-hover shadow-sm'
-                : 'bg-surface-2 text-slate-300 cursor-not-allowed',
-            )}
+            className="h-9 w-9 shrink-0 rounded-full"
             title="Send"
           >
             <SendHorizonal size={15} />
-          </button>
+          </Button>
         )}
       </div>
     </div>
