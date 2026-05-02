@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils'
 type SourceType = 'pdfUrl' | 'webUrl' | 'upload' | 'text' | 'image' | 'audio' | 'record'
 
 // ── Zod schemas per source type ───────────────────────────────────────────────
-const urlSchema    = z.object({ url: z.string().url('Enter a valid URL') })
+const urlSchema    = z.object({ url: z.url('Enter a valid URL') })
 const textSchema   = z.object({ title: z.string().optional(), content: z.string().min(50, 'Minimum 50 characters') })
 const detailSchema = z.object({ detail: z.enum(['quick', 'standard', 'detailed']) })
 
@@ -234,10 +234,10 @@ export function IngestPanel() {
 
         {/* Source list */}
         <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3 flex items-center gap-2">
+          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3 flex items-center gap-2">
             {t('indexedSources')}
             {sourceList.length > 0 && <Badge variant="secondary">{sourceList.length}</Badge>}
-          </p>
+          </div>
 
           {isLoading && <div className="space-y-2">{[1,2].map(i => <div key={i} className="h-14 rounded-xl bg-muted animate-pulse" />)}</div>}
 
@@ -252,10 +252,10 @@ export function IngestPanel() {
                   <FileText size={15} className="text-muted-foreground shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{s.title || s.document_id.slice(0, 8)}</p>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <div className="text-xs text-muted-foreground flex items-center gap-1.5">
                       <Badge variant="outline" className="text-[10px] h-4 px-1">{s.source_type}</Badge>
                       {t('chunksCount', { count: s.chunk_count })}
-                    </p>
+                    </div>
                   </div>
                   <Button size="icon" variant="ghost" onClick={() => delSrc.mutate(s.document_id)} disabled={delSrc.isPending} title={t('deleteSource')} className="h-7 w-7">
                     <Trash2 size={13} />
