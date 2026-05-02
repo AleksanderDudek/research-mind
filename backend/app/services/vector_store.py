@@ -1,8 +1,10 @@
+"""Vector store singleton — sync for schema ops, async for hot-path search/upsert."""
 from qdrant_client import models
-from qdrant_client.models import Distance, VectorParams, PointStruct
+from qdrant_client.models import Distance, PointStruct, VectorParams
 from loguru import logger
+
 from app.config import settings
-from app.services._qdrant import get_client
+from app.services._qdrant import get_async_client, get_client
 
 
 class VectorStore:
@@ -22,18 +24,16 @@ class VectorStore:
             logger.info(f"Creating collection: {self.collection}")
             self.client.create_collection(
                 collection_name=self.collection,
-                vectors_config=VectorParams(
-                    size=settings.embedding_dim,
-                    distance=Distance.COSINE,
-                ),
+                vectors_config=VectorParams(size=settings.embedding_dim, distance=Distance.COSINE),
             )
-        # Ensure indexes exist on every startup — collection may predate context_id.
         for field in ("source_type", "document_id", "context_id"):
             self.client.create_payload_index(
                 collection_name=self.collection,
                 field_name=field,
                 field_schema=models.PayloadSchemaType.KEYWORD,
             )
+
+    # ── Sync helpers (used by ingestion pipeline, schema ops) ─────────────────
 
     def list_documents(self, context_id: str | None = None) -> list[dict]:
         seen: set[str] = set()
@@ -46,23 +46,19 @@ class VectorStore:
             ])
         while True:
             records, offset = self.client.scroll(
-                collection_name=self.collection,
-                limit=100,
-                offset=offset,
-                scroll_filter=scroll_filter,
-                with_payload=True,
-                with_vectors=False,
+                collection_name=self.collection, limit=100, offset=offset,
+                scroll_filter=scroll_filter, with_payload=True, with_vectors=False,
             )
             for r in records:
                 doc_id = r.payload.get("document_id", "")
                 if doc_id and doc_id not in seen:
                     seen.add(doc_id)
                     results.append({
-                        "document_id": doc_id,
-                        "title": r.payload.get("title") or r.payload.get("source", ""),
-                        "source_type": r.payload.get("source_type", ""),
-                        "ingested_at": r.payload.get("ingested_at", ""),
-                        "context_id": r.payload.get("context_id"),
+                        "document_id":  doc_id,
+                        "title":        r.payload.get("title") or r.payload.get("source", ""),
+                        "source_type":  r.payload.get("source_type", ""),
+                        "ingested_at":  r.payload.get("ingested_at", ""),
+                        "context_id":   r.payload.get("context_id"),
                     })
             if offset is None:
                 break
@@ -71,25 +67,16 @@ class VectorStore:
     def upsert(self, points: list[PointStruct]) -> None:
         self.client.upsert(collection_name=self.collection, points=points)
 
-    def search(
-        self,
-        query_vector: list[float],
-        top_k: int = 5,
-        filters: dict[str, str] | None = None,
-    ) -> list:
-        conditions = []
-        if filters:
-            conditions = [
-                models.FieldCondition(key=k, match=models.MatchValue(value=v))
-                for k, v in filters.items()
-            ]
-        query_filter = models.Filter(must=conditions) if conditions else None
-
+    def search(self, query_vector: list[float], top_k: int = 5, filters: dict[str, str] | None = None) -> list:
+        conditions = (
+            [models.FieldCondition(key=k, match=models.MatchValue(value=v)) for k, v in filters.items()]
+            if filters else []
+        )
         return self.client.search(
             collection_name=self.collection,
             query_vector=query_vector,
             limit=top_k,
-            query_filter=query_filter,
+            query_filter=models.Filter(must=conditions) if conditions else None,
         )
 
     def delete_by_document(self, document_id: str, context_id: str | None = None) -> None:
@@ -105,10 +92,33 @@ class VectorStore:
     def delete_by_context(self, context_id: str) -> None:
         self.client.delete(
             collection_name=self.collection,
-            points_selector=models.FilterSelector(
-                filter=models.Filter(must=[
-                    models.FieldCondition(key="context_id", match=models.MatchValue(value=context_id))
-                ])
-            ),
+            points_selector=models.FilterSelector(filter=models.Filter(must=[
+                models.FieldCondition(key="context_id", match=models.MatchValue(value=context_id))
+            ])),
         )
         logger.info(f"Deleted all vectors for context {context_id!r}")
+
+    # ── Async hot-path methods (used by agent on every query) ──────────────────
+
+    async def search_async(
+        self,
+        query_vector: list[float],
+        top_k: int = 5,
+        filters: dict[str, str] | None = None,
+    ) -> list:
+        """Non-blocking Qdrant search — does not block the event loop."""
+        conditions = (
+            [models.FieldCondition(key=k, match=models.MatchValue(value=v)) for k, v in filters.items()]
+            if filters else []
+        )
+        aclient = get_async_client()
+        return await aclient.search(
+            collection_name=self.collection,
+            query_vector=query_vector,
+            limit=top_k,
+            query_filter=models.Filter(must=conditions) if conditions else None,
+        )
+
+    async def upsert_async(self, points: list[PointStruct]) -> None:
+        """Non-blocking upsert for async ingestion paths."""
+        await get_async_client().upsert(collection_name=self.collection, points=points)

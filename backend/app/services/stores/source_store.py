@@ -2,6 +2,7 @@
 import uuid
 from datetime import datetime, timezone
 
+from cachetools import TTLCache
 from loguru import logger
 from qdrant_client import models
 from qdrant_client.models import PointStruct
@@ -9,6 +10,9 @@ from qdrant_client.models import PointStruct
 from app.config import settings
 from app.services._qdrant import get_client
 from app.services.stores.base import DUMMY_VEC, ensure_collection
+
+# Sources per context change only on ingest/delete — cache list for 60 s.
+_list_cache: TTLCache = TTLCache(maxsize=256, ttl=60)
 
 
 def _ensure_collection() -> None:
@@ -50,10 +54,13 @@ def save_source(
         collection_name=settings.qdrant_sources_collection,
         points=[PointStruct(id=record_id, vector=DUMMY_VEC, payload=payload)],
     )
+    _list_cache.pop(context_id, None)   # invalidate this context's source list
     return payload
 
 
 def list_sources(context_id: str) -> list[dict]:
+    if context_id in _list_cache:
+        return _list_cache[context_id]
     client = get_client()
     results, _ = client.scroll(
         collection_name=settings.qdrant_sources_collection,
@@ -64,7 +71,9 @@ def list_sources(context_id: str) -> list[dict]:
         with_payload=True,
         with_vectors=False,
     )
-    return [r.payload for r in results]
+    data = [r.payload for r in results]
+    _list_cache[context_id] = data
+    return data
 
 
 def get_source(context_id: str, document_id: str) -> dict | None:
@@ -82,12 +91,16 @@ def get_source(context_id: str, document_id: str) -> dict | None:
     return results[0].payload if results else None
 
 
-def delete_source(document_id: str) -> bool:
+def delete_source(document_id: str, context_id: str | None = None) -> bool:
     record_id = str(uuid.uuid5(uuid.NAMESPACE_OID, document_id))
     get_client().delete(
         collection_name=settings.qdrant_sources_collection,
         points_selector=models.PointIdsList(points=[record_id]),
     )
+    if context_id:
+        _list_cache.pop(context_id, None)
+    else:
+        _list_cache.clear()
     return True
 
 
@@ -98,3 +111,4 @@ def delete_sources_for_context(context_id: str) -> None:
             models.FieldCondition(key="context_id", match=models.MatchValue(value=context_id)),
         ])),
     )
+    _list_cache.pop(context_id, None)

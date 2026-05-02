@@ -38,10 +38,12 @@ jobs:
           flags: >-
             --allow-unauthenticated
             --port=8000
-            --memory=2Gi
-            --cpu=1
+            --memory=4Gi
+            --cpu=2
+            --cpu-boost
+            --concurrency=8
             --min-instances=1
-            --max-instances=3
+            --max-instances=10
             --timeout=300
           env_vars: |
             LITELLM_BASE_URL=https://api.groq.com/openai

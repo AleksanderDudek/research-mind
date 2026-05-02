@@ -1,6 +1,18 @@
-from sentence_transformers import SentenceTransformer
+"""Sentence-Transformer embedding singleton with LRU cache and async support."""
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+
+from cachetools import LRUCache
 from loguru import logger
+from sentence_transformers import SentenceTransformer
+
 from app.config import settings
+
+# LRU cache: avoids re-embedding the same query text on repeated calls.
+_embed_cache: LRUCache = LRUCache(maxsize=2048)
+
+# Thread-pool for CPU-bound encode() — prevents blocking the async event loop.
+_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="embedder")
 
 
 class Embedder:
@@ -14,8 +26,22 @@ class Embedder:
         return cls._instance
 
     def embed(self, texts: list[str]) -> list[list[float]]:
-        vectors = self.model.encode(texts, normalize_embeddings=True)
+        """Batch-encode texts. SentenceTransformer encodes all texts in one pass."""
+        vectors = self.model.encode(texts, normalize_embeddings=True, batch_size=32)
         return vectors.tolist()
 
     def embed_one(self, text: str) -> list[float]:
-        return self.embed([text])[0]
+        """Encode a single text, with LRU caching for repeated inputs."""
+        if text in _embed_cache:
+            return _embed_cache[text]
+        vec = self.embed([text])[0]
+        _embed_cache[text] = vec
+        return vec
+
+    async def embed_one_async(self, text: str) -> list[float]:
+        """Non-blocking embed: runs in a thread pool so the event loop stays free."""
+        if text in _embed_cache:
+            return _embed_cache[text]
+        loop = asyncio.get_event_loop()
+        vec = await loop.run_in_executor(_executor, self.embed_one, text)
+        return vec
