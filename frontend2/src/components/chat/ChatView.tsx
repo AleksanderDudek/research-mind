@@ -28,16 +28,19 @@ export function ChatView({ onVoiceOpen }: Props) {
   const [loading,  setLoading]  = useState(false)
   const [thinking, setThinking] = useState(false)
 
-  const { data: histMsgs = [], isLoading: histLoading } = useQuery({
+  const { data: histMsgs, isLoading: histLoading } = useQuery({
     queryKey: ['messages', ctx.context_id],
     queryFn:  () => msgsApi.list(ctx.context_id),
     staleTime: Infinity,
   })
 
-  // Sync fetched history to store. Must NOT be inside select — a new arrow
-  // function each render causes TanStack Query to call setMsgs every render,
-  // erasing locally appended messages.
-  useEffect(() => { setMsgs(histMsgs) }, [histMsgs, setMsgs])
+  // Sync fetched history to the store once per data change.
+  // Do NOT default histMsgs to [] in the destructuring — that creates a new
+  // [] reference every render while data is undefined, making this effect fire
+  // on every render → setMsgs loop → maximum update depth exceeded.
+  useEffect(() => {
+    if (histMsgs !== undefined) setMsgs(histMsgs)
+  }, [histMsgs, setMsgs])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
