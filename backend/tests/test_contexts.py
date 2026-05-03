@@ -1,153 +1,79 @@
-LONG_TEXT = "Context-scoped retrieval allows isolated knowledge buckets in RAG systems. " * 8
+"""Integration tests for context CRUD and cascade delete."""
+from tests.conftest import LONG_TEXT
+
+GHOST_ID = "00000000-dead-beef-0000-000000000000"
 
 
-def test_list_contexts_empty_initially(client):
-    r = client.get("/contexts")
-    assert r.status_code == 200
-    assert isinstance(r.json(), list)
+class TestContextCRUD:
+    def test_list_returns_list(self, client):
+        r = client.get("/contexts")
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+    def test_create_with_name(self, client):
+        r = client.post("/contexts", json={"name": "My Research"})
+        assert r.status_code == 200
+        data = r.json()
+        assert data["name"] == "My Research"
+        assert "context_id" in data
+        assert "created_at" in data
+        assert "updated_at" in data
+
+    def test_create_without_name_auto_generates(self, client):
+        r = client.post("/contexts", json={})
+        assert r.status_code == 200
+        assert r.json()["name"]  # truthy auto-generated timestamp name
+
+    def test_created_context_appears_in_list(self, client):
+        ctx = client.post("/contexts", json={"name": "List Test"}).json()
+        ctx_id = ctx["context_id"]
+        ids = [c["context_id"] for c in client.get("/contexts").json()]
+        assert ctx_id in ids
+
+    def test_rename(self, client, fresh_context):
+        r = client.patch(f"/contexts/{fresh_context}", json={"name": "Renamed"})
+        assert r.status_code == 200
+        assert r.json()["name"] == "Renamed"
+
+    def test_rename_not_found(self, client):
+        r = client.patch(f"/contexts/{GHOST_ID}", json={"name": "X"})
+        assert r.status_code == 404
+
+    def test_delete(self, client):
+        ctx_id = client.post("/contexts", json={"name": "To Delete"}).json()["context_id"]
+        r = client.delete(f"/contexts/{ctx_id}")
+        assert r.status_code == 200
+        assert r.json()["deleted"] == ctx_id
+
+    def test_delete_not_found(self, client):
+        r = client.delete(f"/contexts/{GHOST_ID}")
+        assert r.status_code == 404
+
+    def test_deleted_context_absent_from_list(self, client):
+        ctx_id = client.post("/contexts", json={"name": "Gone"}).json()["context_id"]
+        client.delete(f"/contexts/{ctx_id}")
+        ids = [c["context_id"] for c in client.get("/contexts").json()]
+        assert ctx_id not in ids
 
 
-def test_create_context_with_name(client):
-    r = client.post("/contexts", json={"name": "My Research"})
-    assert r.status_code == 200
-    data = r.json()
-    assert data["name"] == "My Research"
-    assert "context_id" in data
-    assert "created_at" in data
+class TestContextCascadeDelete:
+    def test_sources_empty_after_cascade(self, client):
+        ctx_id = client.post("/contexts", json={"name": "Cascade Src"}).json()["context_id"]
+        client.post("/ingest/raw-text", json={"text": LONG_TEXT, "title": "Doc", "context_id": ctx_id})
+        assert len(client.get(f"/contexts/{ctx_id}/sources").json()) == 1
 
+        client.delete(f"/contexts/{ctx_id}")
 
-def test_create_context_without_name(client):
-    r = client.post("/contexts", json={})
-    assert r.status_code == 200
-    data = r.json()
-    assert data["name"]  # auto-generated timestamp name
+        assert client.get(f"/contexts/{ctx_id}/sources").json() == []
 
+    def test_history_empty_after_cascade(self, client):
+        ctx_id = client.post("/contexts", json={"name": "Cascade Hist"}).json()["context_id"]
+        client.post("/ingest/raw-text", json={"text": LONG_TEXT, "title": "Doc", "context_id": ctx_id})
+        client.delete(f"/contexts/{ctx_id}")
+        assert client.get(f"/contexts/{ctx_id}/history").json() == []
 
-def test_rename_context(client):
-    ctx = client.post("/contexts", json={"name": "Old Name"}).json()
-    ctx_id = ctx["context_id"]
-
-    r = client.patch(f"/contexts/{ctx_id}", json={"name": "New Name"})
-    assert r.status_code == 200
-    assert r.json()["name"] == "New Name"
-
-
-def test_rename_context_not_found(client):
-    r = client.patch("/contexts/00000000-dead-beef-0000-000000000000", json={"name": "X"})
-    assert r.status_code == 404
-
-
-def test_delete_context(client):
-    ctx = client.post("/contexts", json={"name": "To Delete"}).json()
-    ctx_id = ctx["context_id"]
-
-    r = client.delete(f"/contexts/{ctx_id}")
-    assert r.status_code == 200
-    assert r.json()["deleted"] == ctx_id
-
-
-def test_delete_context_not_found(client):
-    r = client.delete("/contexts/00000000-dead-beef-0000-000000000001")
-    assert r.status_code == 404
-
-
-def test_sources_empty_for_new_context(client):
-    ctx = client.post("/contexts", json={"name": "Empty"}).json()
-    r = client.get(f"/contexts/{ctx['context_id']}/sources")
-    assert r.status_code == 200
-    assert r.json() == []
-
-
-def test_history_empty_for_new_context(client):
-    ctx = client.post("/contexts", json={"name": "Empty History"}).json()
-    r = client.get(f"/contexts/{ctx['context_id']}/history")
-    assert r.status_code == 200
-    assert r.json() == []
-
-
-def test_ingest_appears_in_sources_and_history(client):
-    ctx = client.post("/contexts", json={"name": "Source Test"}).json()
-    ctx_id = ctx["context_id"]
-
-    client.post("/ingest/raw-text", json={"text": LONG_TEXT, "title": "My Doc", "context_id": ctx_id})
-
-    sources = client.get(f"/contexts/{ctx_id}/sources").json()
-    assert len(sources) == 1
-    assert sources[0]["title"] == "My Doc"
-    assert sources[0]["source_type"] == "text"
-    assert sources[0]["chunk_count"] >= 1
-
-    history = client.get(f"/contexts/{ctx_id}/history").json()
-    assert len(history) >= 1
-    assert any(e["action"] == "source_added" for e in history)
-
-
-def test_get_source_text(client):
-    ctx = client.post("/contexts", json={"name": "Edit Test"}).json()
-    ctx_id = ctx["context_id"]
-
-    client.post("/ingest/raw-text", json={"text": LONG_TEXT, "title": "Editable", "context_id": ctx_id})
-    sources = client.get(f"/contexts/{ctx_id}/sources").json()
-    doc_id = sources[0]["document_id"]
-
-    r = client.get(f"/contexts/{ctx_id}/sources/{doc_id}/text")
-    assert r.status_code == 200
-    data = r.json()
-    assert "raw_text" in data
-    assert data["raw_text"] == LONG_TEXT
-
-
-def test_edit_source(client):
-    ctx = client.post("/contexts", json={"name": "Edit Source"}).json()
-    ctx_id = ctx["context_id"]
-
-    client.post("/ingest/raw-text", json={"text": LONG_TEXT, "title": "Original", "context_id": ctx_id})
-    sources = client.get(f"/contexts/{ctx_id}/sources").json()
-    doc_id = sources[0]["document_id"]
-
-    new_text = "Edited content about information retrieval systems. " * 8
-    r = client.put(
-        f"/contexts/{ctx_id}/sources/{doc_id}",
-        json={"text": new_text, "title": "Edited"},
-    )
-    assert r.status_code == 200
-    data = r.json()
-    assert data["chunks_ingested"] >= 1
-
-    updated = client.get(f"/contexts/{ctx_id}/sources/{doc_id}/text").json()
-    assert updated["raw_text"] == new_text
-    assert updated["title"] == "Edited"
-
-    history = client.get(f"/contexts/{ctx_id}/history").json()
-    assert any(e["action"] == "source_edited" for e in history)
-
-
-def test_delete_source(client):
-    ctx = client.post("/contexts", json={"name": "Delete Source"}).json()
-    ctx_id = ctx["context_id"]
-
-    client.post("/ingest/raw-text", json={"text": LONG_TEXT, "title": "To Remove", "context_id": ctx_id})
-    sources = client.get(f"/contexts/{ctx_id}/sources").json()
-    doc_id = sources[0]["document_id"]
-
-    r = client.delete(f"/contexts/{ctx_id}/sources/{doc_id}")
-    assert r.status_code == 200
-    assert r.json()["deleted"] == doc_id
-
-    remaining = client.get(f"/contexts/{ctx_id}/sources").json()
-    assert all(s["document_id"] != doc_id for s in remaining)
-
-
-def test_delete_context_cascades(client):
-    ctx = client.post("/contexts", json={"name": "Cascade Delete"}).json()
-    ctx_id = ctx["context_id"]
-
-    client.post("/ingest/raw-text", json={"text": LONG_TEXT, "title": "Cascade Doc", "context_id": ctx_id})
-
-    client.delete(f"/contexts/{ctx_id}")
-
-    sources = client.get(f"/contexts/{ctx_id}/sources").json()
-    assert sources == []
-
-    history = client.get(f"/contexts/{ctx_id}/history").json()
-    assert history == []
+    def test_messages_empty_after_cascade(self, client):
+        ctx_id = client.post("/contexts", json={"name": "Cascade Msgs"}).json()["context_id"]
+        client.post(f"/contexts/{ctx_id}/messages", json={"role": "user", "content": "hello"})
+        client.delete(f"/contexts/{ctx_id}")
+        assert client.get(f"/contexts/{ctx_id}/messages").json() == []
