@@ -50,5 +50,10 @@ class Settings(BaseSettings):
     langfuse_secret_key: str = ""
     langfuse_host: str = "http://localhost:3000"
 
+    # Supabase auth (leave empty to disable auth enforcement — dev only)
+    supabase_url:         str = ""   # e.g. https://xxxx.supabase.co
+    supabase_jwt_secret:  str = ""   # JWT secret for local verification
+    supabase_service_key: str = ""   # service-role key for admin ops
+
 
 settings = Settings()

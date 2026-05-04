@@ -18,6 +18,8 @@ export function ContextPanel() {
   const t         = useTranslations()
   const locale    = useLocale()
   const setActive = useAppStore(s => s.setActiveContext)
+  const role      = useAppStore(s => s.role)
+  const isAdmin   = role === 'admin' || role === 'superadmin'
   const qc        = useQueryClient()
 
   const [name,   setName]   = useState('')
@@ -62,24 +64,26 @@ export function ContextPanel() {
 
       {/* Main */}
       <main className="flex-1 max-w-content mx-auto w-full px-4 py-8 space-y-8">
-        {/* Create */}
-        <section>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
-            {t('newContextSection')}
-          </p>
-          <div className="flex gap-2">
-            <Input
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder={t('contextName')}
-              onKeyDown={e => { if (e.key === 'Enter') create.mutate() }}
-              className="flex-1"
-            />
-            <Button onClick={() => create.mutate()} disabled={create.isPending} className="shrink-0 gap-1.5">
-              <Plus size={15} /> {t('createContext')}
-            </Button>
-          </div>
-        </section>
+        {/* Create — only ADMINs and SUPERADMINs can create contexts */}
+        {isAdmin && (
+          <section>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
+              {t('newContextSection')}
+            </p>
+            <div className="flex gap-2">
+              <Input
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder={t('contextName')}
+                onKeyDown={e => { if (e.key === 'Enter') create.mutate() }}
+                className="flex-1"
+              />
+              <Button onClick={() => create.mutate()} disabled={create.isPending} className="shrink-0 gap-1.5">
+                <Plus size={15} /> {t('createContext')}
+              </Button>
+            </div>
+          </section>
+        )}
 
         {/* List */}
         <section>

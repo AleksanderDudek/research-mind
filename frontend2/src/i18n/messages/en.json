@@ -113,5 +113,31 @@
   "startRecording": "Start recording",
   "maxDuration": "Max {n} minutes",
   "timeRemaining": "{t} remaining",
-  "transcribeAndAdd": "Transcribe & add as source"
+  "transcribeAndAdd": "Transcribe & add as source",
+
+  "authSignIn": "Sign in",
+  "authSignInSubtitle": "Sign in to your account",
+  "authSigningIn": "Signing in…",
+  "authSignUp": "Sign up",
+  "authSignOut": "Sign out",
+  "authCreateAccount": "Create account",
+  "authCreatingAccount": "Creating account…",
+  "authEmail": "Email address",
+  "authPassword": "Password (min 8 chars)",
+  "authPasswordMin": "Password must be at least 8 characters.",
+  "authFullName": "Full name",
+  "authOrgName": "Organisation name (optional)",
+  "authNoAccount": "Don't have an account?",
+  "authHaveAccount": "Already have an account?",
+
+  "adminPanel": "Admin panel",
+  "adminInviteUser": "Invite user",
+  "adminInvite": "Invite",
+  "adminInviteSent": "Invitation sent to {email}",
+  "adminMembers": "Organisation members",
+  "adminRemoveMember": "Remove from organisation",
+  "adminMemberRemoved": "Member removed",
+  "adminAllOrgs": "All organisations",
+
+  "superAdminPanel": "Super Admin"
 }

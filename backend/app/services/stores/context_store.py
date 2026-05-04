@@ -1,4 +1,8 @@
-"""Context metadata store (rm_contexts collection)."""
+"""Context metadata store (rm_contexts collection).
+
+Each context now carries an `org_id` field so rows can be filtered by org.
+`created_by` captures the user_id of the ADMIN who created the context.
+"""
 import uuid
 from datetime import datetime, timezone
 
@@ -11,54 +15,41 @@ from app.config import settings
 from app.services._qdrant import get_client
 from app.services.stores.base import DUMMY_VEC, ensure_collection
 
-_LEGACY_ID   = "00000000-0000-0000-0000-000000000000"
-_LEGACY_NAME = "Imported data"
-
 # Context metadata changes infrequently — cache list for 60 s, individual lookups for 120 s.
-_list_cache: TTLCache  = TTLCache(maxsize=4,   ttl=60)
+_list_cache: TTLCache  = TTLCache(maxsize=256, ttl=60)
 _item_cache: TTLCache  = TTLCache(maxsize=512, ttl=120)
 
 
 def _ensure_collection() -> None:
     created = ensure_collection(
         settings.qdrant_contexts_collection,
-        indexes=["context_id"],
+        indexes=["context_id", "org_id"],
     )
     if created:
         logger.info(f"Created collection: {settings.qdrant_contexts_collection}")
-        _seed_legacy()
 
 
-def _seed_legacy() -> None:
+def list_contexts(org_id: str | None = None) -> list[dict]:
+    """Return all contexts, optionally filtered to a single organisation."""
+    cache_key = org_id or "all"
+    if cache_key in _list_cache:
+        return _list_cache[cache_key]
+
     client = get_client()
-    now = datetime.now(timezone.utc).isoformat()
-    client.upsert(
-        collection_name=settings.qdrant_contexts_collection,
-        points=[PointStruct(
-            id=_LEGACY_ID,
-            vector=DUMMY_VEC,
-            payload={
-                "context_id": _LEGACY_ID,
-                "name": _LEGACY_NAME,
-                "created_at": now,
-                "updated_at": now,
-            },
-        )],
-    )
-
-
-def list_contexts() -> list[dict]:
-    if "all" in _list_cache:
-        return _list_cache["all"]
-    client = get_client()
+    scroll_filter = None
+    if org_id:
+        scroll_filter = models.Filter(must=[
+            models.FieldCondition(key="org_id", match=models.MatchValue(value=org_id)),
+        ])
     results, _ = client.scroll(
         collection_name=settings.qdrant_contexts_collection,
+        scroll_filter=scroll_filter,
         limit=500,
         with_payload=True,
         with_vectors=False,
     )
     data = [r.payload for r in results]
-    _list_cache["all"] = data
+    _list_cache[cache_key] = data
     return data
 
 
@@ -76,13 +67,19 @@ def get_context(context_id: str) -> dict | None:
     return payload
 
 
-def create_context(name: str | None = None) -> dict:
+def create_context(
+    name: str | None = None,
+    org_id: str = "",
+    created_by: str = "",
+) -> dict:
     client = get_client()
     context_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
     payload = {
         "context_id": context_id,
-        "name": name or datetime.now(timezone.utc).strftime("%Y.%m.%d %H:%M"),
+        "name":       name or datetime.now(timezone.utc).strftime("%Y.%m.%d %H:%M"),
+        "org_id":     org_id,
+        "created_by": created_by,
         "created_at": now,
         "updated_at": now,
     }
@@ -91,7 +88,7 @@ def create_context(name: str | None = None) -> dict:
         points=[PointStruct(id=context_id, vector=DUMMY_VEC, payload=payload)],
     )
     _list_cache.clear()
-    logger.info(f"Created context {context_id!r} name={payload['name']!r}")
+    logger.info(f"Created context {context_id!r} org={org_id!r} name={payload['name']!r}")
     return payload
 
 

@@ -55,6 +55,7 @@ def store_and_log(
     raw_text: str,
     url: str | None,
     chunk_count: int,
+    org_id: str = "",
     image_data: str | None = None,
     image_mime_type: str | None = None,
 ) -> dict:
@@ -68,6 +69,7 @@ def store_and_log(
         raw_text=raw_text,
         url=url,
         chunk_count=chunk_count,
+        org_id=org_id,
         image_data=image_data,
         image_mime_type=image_mime_type,
     )
@@ -75,6 +77,7 @@ def store_and_log(
         context_id=context_id,
         action=HistoryAction.SOURCE_ADDED,
         detail=f"{source_type}: {title or document_id}",
+        org_id=org_id,
     )
     return {
         "document_id":     document_id,

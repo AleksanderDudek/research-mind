@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, HttpUrl
 from loguru import logger
 
+from app.auth.deps import AuthUserDep
+from app.auth.access import require_admin
 from app.enums import DetailLevel
 from app.schemas import IngestionResult
 from app.services.ingest import IngestionService
@@ -42,9 +44,10 @@ class TextRequest(BaseModel):
 
 
 @router.post("/pdf-url", response_model=IngestionResult, responses=_400_500)
-async def ingest_pdf_from_url(req: URLRequest, service: ServiceDep) -> dict:
+async def ingest_pdf_from_url(req: URLRequest, user: AuthUserDep, service: ServiceDep) -> dict:
+    require_admin(user)
     try:
-        return await service.ingest_pdf_url(str(req.url), req.context_id)
+        return await service.ingest_pdf_url(str(req.url), req.context_id, org_id=user.org_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
@@ -53,9 +56,10 @@ async def ingest_pdf_from_url(req: URLRequest, service: ServiceDep) -> dict:
 
 
 @router.post("/web-url", response_model=IngestionResult, responses=_400_500)
-async def ingest_web_page(req: URLRequest, service: ServiceDep) -> dict:
+async def ingest_web_page(req: URLRequest, user: AuthUserDep, service: ServiceDep) -> dict:
+    require_admin(user)
     try:
-        return await service.ingest_web_url(str(req.url), req.context_id)
+        return await service.ingest_web_url(str(req.url), req.context_id, org_id=user.org_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
@@ -67,12 +71,19 @@ async def ingest_web_page(req: URLRequest, service: ServiceDep) -> dict:
 async def ingest_pdf_upload(
     file: Annotated[UploadFile, File()],
     context_id: Annotated[str, Form()],
+    user: AuthUserDep,
     service: ServiceDep,
 ) -> dict:
+    require_admin(user)
     if not (file.filename or "").lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="File must have .pdf extension.")
     try:
-        return service.ingest_pdf_bytes(await file.read(), source=file.filename or "upload.pdf", context_id=context_id)
+        return service.ingest_pdf_bytes(
+            await file.read(),
+            source=file.filename or "upload.pdf",
+            context_id=context_id,
+            org_id=user.org_id,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
@@ -81,11 +92,12 @@ async def ingest_pdf_upload(
 
 
 @router.post("/raw-text", response_model=IngestionResult, responses=_400_500)
-async def ingest_raw_text(req: TextRequest, service: ServiceDep) -> dict:
+async def ingest_raw_text(req: TextRequest, user: AuthUserDep, service: ServiceDep) -> dict:
+    require_admin(user)
     if len(req.text.strip()) < 50:
         raise HTTPException(status_code=400, detail="Text too short (min 50 characters).")
     try:
-        return service.ingest_raw_text(req.text, req.title, req.context_id)
+        return service.ingest_raw_text(req.text, req.title, req.context_id, org_id=user.org_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
@@ -97,9 +109,11 @@ async def ingest_raw_text(req: TextRequest, service: ServiceDep) -> dict:
 async def ingest_image(
     file: Annotated[UploadFile, File()],
     context_id: Annotated[str, Form()],
+    user: AuthUserDep,
     service: ServiceDep,
     detail_level: Annotated[str, Form()] = DetailLevel.STANDARD,
 ) -> dict:
+    require_admin(user)
     if detail_level not in DetailLevel.__members__.values():
         detail_level = DetailLevel.STANDARD
     image_bytes = await file.read()
@@ -111,6 +125,7 @@ async def ingest_image(
             filename=file.filename or "image",
             context_id=context_id,
             detail_level=detail_level,
+            org_id=user.org_id,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -123,8 +138,10 @@ async def ingest_image(
 async def ingest_audio(
     file: Annotated[UploadFile, File()],
     context_id: Annotated[str, Form()],
+    user: AuthUserDep,
     service: ServiceDep,
 ) -> dict:
+    require_admin(user)
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in _AUDIO_EXTENSIONS:
         raise HTTPException(
@@ -140,6 +157,7 @@ async def ingest_audio(
             audio_bytes=audio_bytes,
             filename=file.filename or "audio",
             context_id=context_id,
+            org_id=user.org_id,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

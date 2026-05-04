@@ -14,15 +14,16 @@ from app.services.stores.base import DUMMY_VEC, ensure_collection
 def _ensure_collection() -> None:
     created = ensure_collection(
         settings.qdrant_history_collection,
-        indexes=["context_id"],
+        indexes=["context_id", "org_id"],
     )
     if created:
         logger.info(f"Created collection: {settings.qdrant_history_collection}")
 
 
-def append(context_id: str, action: str, detail: str) -> dict:
+def append(context_id: str, action: str, detail: str, org_id: str = "") -> dict:
     payload = {
         "context_id": context_id,
+        "org_id":     org_id,
         "action":     action,
         "detail":     detail,
         "timestamp":  datetime.now(timezone.utc).isoformat(),

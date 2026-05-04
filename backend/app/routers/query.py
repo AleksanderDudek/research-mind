@@ -15,6 +15,7 @@ from loguru import logger
 from pydantic import BaseModel
 
 from app.agents.research_agent import ResearchAgent
+from app.auth.deps import AuthUserDep
 from app.schemas import TranscribeResult
 from app.services.embedder import Embedder
 from app.services.transcriber import Transcriber
@@ -69,7 +70,7 @@ class AskRequest(BaseModel):
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 
 @router.get("/documents", responses=_500)
-async def list_documents(store: StoreDep, context_id: str | None = None) -> dict:
+async def list_documents(user: AuthUserDep, store: StoreDep, context_id: str | None = None) -> dict:
     try:
         docs = store.list_documents(context_id=context_id)
         return {"count": len(docs), "documents": docs}
@@ -79,7 +80,7 @@ async def list_documents(store: StoreDep, context_id: str | None = None) -> dict
 
 
 @router.post("/search", responses=_500)
-async def semantic_search(req: SearchRequest, embedder: EmbedderDep, store: StoreDep) -> dict:
+async def semantic_search(req: SearchRequest, user: AuthUserDep, embedder: EmbedderDep, store: StoreDep) -> dict:
     try:
         vec = await embedder.embed_one_async(req.question)
         filters: dict[str, str] = {}
@@ -106,7 +107,7 @@ async def semantic_search(req: SearchRequest, embedder: EmbedderDep, store: Stor
 
 
 @router.post("/ask", responses=_500)
-async def ask_agent(req: AskRequest, agent: AgentDep, background: BackgroundTasks) -> dict:
+async def ask_agent(req: AskRequest, user: AuthUserDep, agent: AgentDep, background: BackgroundTasks) -> dict:
     """Blocking ask — critic runs in the background so it never delays the response."""
     key = _cache_key(req.question, req.context_id)
     if key in _ask_cache:
@@ -123,7 +124,7 @@ async def ask_agent(req: AskRequest, agent: AgentDep, background: BackgroundTask
 
 
 @router.post("/ask/stream")
-async def ask_agent_stream(req: AskRequest, agent: AgentDep) -> StreamingResponse:
+async def ask_agent_stream(req: AskRequest, user: AuthUserDep, agent: AgentDep) -> StreamingResponse:
     """Stream agent answer as Server-Sent Events.
 
     ``{"type":"chunk","text":"..."}`` — one LLM token
@@ -152,6 +153,7 @@ async def ask_agent_stream(req: AskRequest, agent: AgentDep) -> StreamingRespons
 
 @router.post("/transcribe", response_model=TranscribeResult, responses=_500)
 async def transcribe_audio(
+    user: AuthUserDep,
     file: Annotated[UploadFile, File()],
     language: Annotated[str | None, Form()] = None,
 ) -> dict:

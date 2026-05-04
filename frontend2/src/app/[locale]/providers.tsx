@@ -11,12 +11,11 @@ export default function Providers({ children }: { readonly children: React.React
     defaultOptions: { queries: { staleTime: 30_000, retry: 1 } },
   }))
 
-  // Rehydrate Zustand store from localStorage after the component mounts.
-  // Must run client-side only — reading localStorage during server/hydration
-  // phase causes React error #185 (update before hydration finished).
+  // Rehydrate persisted preferences (ttsEnabled) after mount to avoid React #185.
   useEffect(() => {
     useAppStore.persist.rehydrate()
   }, [])
+
 
   return (
     <QueryClientProvider client={queryClient}>
