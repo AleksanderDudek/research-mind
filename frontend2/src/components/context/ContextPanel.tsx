@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { toast } from 'sonner'
@@ -53,12 +54,12 @@ export function ContextPanel() {
             <span className="text-xl">📚</span>
             <span className="font-bold text-foreground tracking-tight">{t('appTitle')}</span>
           </div>
-          <a
+          <Link
             href={`/${targetLocale}`}
             className="text-sm text-muted-foreground hover:text-primary transition-colors"
           >
             {t('langToggle')}
-          </a>
+          </Link>
         </div>
       </header>
 

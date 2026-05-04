@@ -1,6 +1,7 @@
 'use client'
 
 import { MessageSquare, FileText, History, Settings, Languages, LogOut, ShieldCheck } from 'lucide-react'
+import Link from 'next/link'
 import { useTranslations, useLocale } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
@@ -72,23 +73,23 @@ export function Sidebar({ ctx, tab, sourceCount, onTab, onBack }: Props) {
       <div className="px-4 py-3 border-t space-y-2">
         {/* Admin / superadmin link */}
         {(role === 'admin' || role === 'superadmin') && (
-          <a
+          <Link
             href={role === 'superadmin' ? `/${locale}/superadmin` : `/${locale}/admin`}
             className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
           >
             <ShieldCheck size={14} />
             {role === 'superadmin' ? t('superAdminPanel') : t('adminPanel')}
-          </a>
+          </Link>
         )}
 
         {/* Language toggle */}
-        <a
+        <Link
           href={`/${targetLocale}`}
           className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
         >
           <Languages size={14} />
           {t('langToggle')}
-        </a>
+        </Link>
 
         {/* Sign out */}
         <button

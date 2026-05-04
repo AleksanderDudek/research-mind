@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useTranslations, useLocale } from 'next-intl'
 import { supabase } from '@/lib/supabase'
@@ -79,9 +80,9 @@ export default function SignupPage() {
 
         <p className="text-center text-sm text-muted-foreground">
           {t('authHaveAccount')}{' '}
-          <a href={`/${locale}/auth/login`} className="text-primary hover:underline">
+          <Link href={`/${locale}/auth/login`} className="text-primary hover:underline">
             {t('authSignIn')}
-          </a>
+          </Link>
         </p>
       </div>
     </div>

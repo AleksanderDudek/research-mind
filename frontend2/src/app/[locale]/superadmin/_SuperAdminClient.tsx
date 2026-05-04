@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query'
 import { org as orgApi } from '@/lib/api'
 import { useAppStore } from '@/lib/store'
 import { Badge } from '@/components/ui/badge'
+import Link from 'next/link'
 
 export default function SuperAdminPage() {
   const t      = useTranslations()
@@ -27,9 +28,9 @@ export default function SuperAdminPage() {
   return (
     <div className="min-h-dvh bg-background">
       <header className="border-b bg-card px-6 py-4 flex items-center gap-3">
-        <a href={`/${locale}`} className="text-sm text-muted-foreground hover:text-primary transition-colors">
+        <Link href={`/${locale}`} className="text-sm text-muted-foreground hover:text-primary transition-colors">
           ← {t('back')}
-        </a>
+        </Link>
         <span className="text-muted-foreground">/</span>
         <p className="font-semibold">{t('superAdminPanel')}</p>
       </header>

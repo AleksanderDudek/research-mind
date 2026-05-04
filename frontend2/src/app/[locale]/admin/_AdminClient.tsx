@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { useAppStore } from '@/lib/store'
 import { UserList }   from '@/components/admin/UserList'
 import { InviteForm } from '@/components/admin/InviteForm'
+import Link from 'next/link'
 
 export default function AdminPage() {
   const t      = useTranslations()
@@ -21,9 +22,9 @@ export default function AdminPage() {
     <div className="min-h-dvh bg-background">
       <header className="border-b bg-card px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <a href={`/${locale}`} className="text-sm text-muted-foreground hover:text-primary transition-colors">
+          <Link href={`/${locale}`} className="text-sm text-muted-foreground hover:text-primary transition-colors">
             ← {t('back')}
-          </a>
+          </Link>
           <span className="text-muted-foreground">/</span>
           <p className="font-semibold">{t('adminPanel')}</p>
         </div>
