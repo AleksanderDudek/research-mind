@@ -15,12 +15,15 @@ class TestMessages:
         assert msgs[0]["role"] == "user"
         assert msgs[0]["content"] == "Hello agent"
         assert "timestamp" in msgs[0]
+        # admin caller — user_id is embedded automatically from the override
+        assert "user_id" in msgs[0]
 
     def test_save_assistant_message_with_sources(self, client, fresh_context):
         client.post(f"/contexts/{fresh_context}/messages", json={
             "role": "assistant",
             "content": "The answer is 42.",
-            "sources": [{"source": "doc.pdf", "score": 0.9, "text": "ctx", "source_type": "pdf"}],
+            "sources": [{"source": "doc.pdf", "score": 0.9,
+                         "text": "ctx", "source_type": "pdf"}],
             "action_taken": "SEARCH",
             "iterations": 1,
         })

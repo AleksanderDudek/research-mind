@@ -24,21 +24,38 @@ export default function HomeClient() {
         return
       }
 
-      const { data: profile } = await supabase
+      // Fetch core profile fields. language is optional — queried separately
+      // so a missing column never blocks the entire login.
+      const { data: profile, error: profileErr } = await supabase
         .from('profiles')
-        .select('org_id, role, full_name, language')
+        .select('org_id, role, full_name')
         .eq('id', session.user.id)
         .single()
 
-      if (profile) {
-        setAuth(
-          session.user.id,
-          profile.org_id ?? '',
-          (profile.role ?? 'user') as AppRole,
-          profile.full_name ?? session.user.email ?? '',
-        )
-        if (profile.language) setLang(profile.language as 'en' | 'pl')
+      if (profileErr || !profile) {
+        // Profile row missing (registered before trigger, or DB error).
+        // Log it clearly and continue as a plain user so the app still loads.
+        console.error('[auth] profile not found:', profileErr?.message ?? 'no row')
+        setReady(true)
+        return
       }
+
+      setAuth(
+        session.user.id,
+        profile.org_id ?? '',
+        (profile.role ?? 'user') as AppRole,
+        profile.full_name ?? session.user.email ?? '',
+      )
+
+      // Language preference is optional — gracefully ignore if column absent
+      const { data: langRow } = await supabase
+        .from('profiles')
+        .select('language')
+        .eq('id', session.user.id)
+        .single()
+
+      if (langRow?.language) setLang(langRow.language as 'en' | 'pl')
+
       setReady(true)
     }
 
