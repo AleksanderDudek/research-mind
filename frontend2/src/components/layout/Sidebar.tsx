@@ -1,7 +1,8 @@
 'use client'
 
 import { MessageSquare, FileText, History, Settings, Languages, LogOut, ShieldCheck } from 'lucide-react'
-import { useTranslations, useLocale } from 'next-intl'
+import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useAppStore } from '@/lib/store'
@@ -25,10 +26,10 @@ const NAV: { id: SidebarTab; Icon: typeof MessageSquare; labelKey: string; badge
 ]
 
 export function Sidebar({ ctx, tab, sourceCount, onTab, onBack }: Props) {
-  const t           = useTranslations()
-  const locale      = useLocale()
-  const targetLocale = locale === 'en' ? 'pl' : 'en'
-  const role        = useAppStore(s => s.role)
+  const t       = useTranslations()
+  const lang    = useAppStore(s => s.lang)
+  const setLang = useAppStore(s => s.setLang)
+  const role    = useAppStore(s => s.role)
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -72,23 +73,24 @@ export function Sidebar({ ctx, tab, sourceCount, onTab, onBack }: Props) {
       <div className="px-4 py-3 border-t space-y-2">
         {/* Admin / superadmin link */}
         {(role === 'admin' || role === 'superadmin') && (
-          <a
-            href={role === 'superadmin' ? `/${locale}/superadmin` : `/${locale}/admin`}
+          <Link
+            href={role === 'superadmin' ? '/superadmin' : '/admin'}
             className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
           >
             <ShieldCheck size={14} />
             {role === 'superadmin' ? t('superAdminPanel') : t('adminPanel')}
-          </a>
+          </Link>
         )}
 
         {/* Language toggle */}
-        <a
-          href={`/${targetLocale}`}
-          className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
+        <button
+          type="button"
+          onClick={() => setLang(lang === 'en' ? 'pl' : 'en')}
+          className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors w-full"
         >
           <Languages size={14} />
           {t('langToggle')}
-        </a>
+        </button>
 
         {/* Sign out */}
         <button

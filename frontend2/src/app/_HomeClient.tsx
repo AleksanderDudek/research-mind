@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useLocale } from 'next-intl'
 import { supabase, type AppRole } from '@/lib/supabase'
 import { useAppStore } from '@/lib/store'
 import { ContextPanel } from '@/components/context/ContextPanel'
@@ -10,9 +9,9 @@ import { ContextView }  from '@/components/context/ContextView'
 
 export default function HomeClient() {
   const router        = useRouter()
-  const locale        = useLocale()
   const activeContext = useAppStore(s => s.activeContext)
   const setAuth       = useAppStore(s => s.setAuth)
+  const setLang       = useAppStore(s => s.setLang)
   const clearAuth     = useAppStore(s => s.clearAuth)
   const [ready, setReady] = useState(false)
 
@@ -21,14 +20,13 @@ export default function HomeClient() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
         clearAuth()
-        router.replace(`/${locale}/auth/login`)
+        router.replace('/auth/login')
         return
       }
 
-      // Load profile (org_id + role) from Supabase
       const { data: profile } = await supabase
         .from('profiles')
-        .select('org_id, role, full_name')
+        .select('org_id, role, full_name, language')
         .eq('id', session.user.id)
         .single()
 
@@ -39,6 +37,7 @@ export default function HomeClient() {
           (profile.role ?? 'user') as AppRole,
           profile.full_name ?? session.user.email ?? '',
         )
+        if (profile.language) setLang(profile.language as 'en' | 'pl')
       }
       setReady(true)
     }
@@ -48,12 +47,12 @@ export default function HomeClient() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
         clearAuth()
-        router.replace(`/${locale}/auth/login`)
+        router.replace('/auth/login')
       }
     })
 
     return () => subscription.unsubscribe()
-  }, [locale, router, setAuth, clearAuth])
+  }, [router, setAuth, setLang, clearAuth])
 
   if (!ready) {
     return (
