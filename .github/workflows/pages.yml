@@ -3,7 +3,7 @@ name: Deploy frontend2 to GitHub Pages
 
 on:
   push:
-    branches: [main, experimental-feature]
+    branches: [main, experimental-feature, superadmins]
     paths:
       - 'frontend2/**'
       - '.github/workflows/pages.yml'
@@ -44,6 +44,8 @@ jobs:
         env:
           NEXT_PUBLIC_BASE_PATH: /research-mind
           NEXT_PUBLIC_BACKEND_URL: ${{ secrets.BACKEND_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       - uses: actions/upload-pages-artifact@v3
         with:
