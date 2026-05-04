@@ -3,14 +3,13 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useTranslations, useLocale } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input  } from '@/components/ui/input'
 
-export default function LoginPage() {
+export default function LoginClient() {
   const t      = useTranslations()
-  const locale = useLocale()
   const router = useRouter()
 
   const [email,    setEmail]    = useState('')
@@ -25,7 +24,7 @@ export default function LoginPage() {
     const { error: authErr } = await supabase.auth.signInWithPassword({ email, password })
     setLoading(false)
     if (authErr) { setError(authErr.message); return }
-    router.push(`/${locale}`)
+    router.push('/')
   }
 
   return (
@@ -37,20 +36,10 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
-          <Input
-            type="email"
-            placeholder={t('authEmail')}
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            required
-          />
-          <Input
-            type="password"
-            placeholder={t('authPassword')}
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            required
-          />
+          <Input type="email" placeholder={t('authEmail')} value={email}
+            onChange={e => setEmail(e.target.value)} required />
+          <Input type="password" placeholder={t('authPassword')} value={password}
+            onChange={e => setPassword(e.target.value)} required />
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? t('authSigningIn') : t('authSignIn')}
@@ -59,7 +48,7 @@ export default function LoginPage() {
 
         <p className="text-center text-sm text-muted-foreground">
           {t('authNoAccount')}{' '}
-          <Link href={`/${locale}/auth/signup`} className="text-primary hover:underline">
+          <Link href="/auth/signup" className="text-primary hover:underline">
             {t('authSignUp')}
           </Link>
         </p>

@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { Plus, Search } from 'lucide-react'
-import { useTranslations, useLocale } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import { contexts as api } from '@/lib/api'
 import type { Context } from '@/lib/types'
 import { useAppStore } from '@/lib/store'
@@ -17,11 +17,12 @@ import { EmptyState  } from './EmptyState'
 
 export function ContextPanel() {
   const t         = useTranslations()
-  const locale    = useLocale()
   const setActive = useAppStore(s => s.setActiveContext)
-  const role      = useAppStore(s => s.role)
-  const isAdmin   = role === 'admin' || role === 'superadmin'
-  const qc        = useQueryClient()
+  const lang    = useAppStore(s => s.lang)
+  const setLang = useAppStore(s => s.setLang)
+  const role    = useAppStore(s => s.role)
+  const isAdmin = role === 'admin' || role === 'superadmin'
+  const qc      = useQueryClient()
 
   const [name,   setName]   = useState('')
   const [search, setSearch] = useState('')
@@ -43,7 +44,6 @@ export function ContextPanel() {
     ? sorted.filter(c => c.name.toLowerCase().includes(search.toLowerCase()))
     : sorted
 
-  const targetLocale = locale === 'en' ? 'pl' : 'en'
 
   return (
     <div className="min-h-dvh flex flex-col">
@@ -54,12 +54,13 @@ export function ContextPanel() {
             <span className="text-xl">📚</span>
             <span className="font-bold text-foreground tracking-tight">{t('appTitle')}</span>
           </div>
-          <Link
-            href={`/${targetLocale}`}
+          <button
+            type="button"
+            onClick={() => setLang(lang === 'en' ? 'pl' : 'en')}
             className="text-sm text-muted-foreground hover:text-primary transition-colors"
           >
             {t('langToggle')}
-          </Link>
+          </button>
         </div>
       </header>
 

@@ -52,7 +52,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name:       'researchmind-settings',
-      partialize: (s) => ({ ttsEnabled: s.ttsEnabled }),
+      partialize: (s) => ({ ttsEnabled: s.ttsEnabled, lang: s.lang }),
       skipHydration: true,
     },
   ),
