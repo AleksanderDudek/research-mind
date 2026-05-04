@@ -1,4 +1,9 @@
-"""Chat message persistence (rm_chat collection)."""
+"""Chat message persistence (rm_chat collection).
+
+Messages now carry `user_id` (who sent/received) and `org_id` (which org).
+`list_messages` accepts an optional `user_id` filter so USERs see only their
+own conversations while ADMINs/SUPERADMINs see everyone's.
+"""
 import uuid
 from datetime import datetime, timezone
 
@@ -14,7 +19,7 @@ from app.services.stores.base import DUMMY_VEC, ensure_collection
 def _ensure_collection() -> None:
     created = ensure_collection(
         settings.qdrant_chat_collection,
-        indexes=["context_id"],
+        indexes=["context_id", "org_id", "user_id"],
     )
     if created:
         logger.info(f"Created collection: {settings.qdrant_chat_collection}")
@@ -24,6 +29,8 @@ def save_message(
     context_id: str,
     role: str,
     content: str,
+    user_id: str = "",
+    org_id: str = "",
     sources: list | None = None,
     action_taken: str | None = None,
     iterations: int | None = None,
@@ -33,6 +40,8 @@ def save_message(
         "context_id": context_id,
         "role":       role,
         "content":    content,
+        "user_id":    user_id,
+        "org_id":     org_id,
         "timestamp":  datetime.now(timezone.utc).isoformat(),
     }
     if sources      is not None: payload["sources"]      = sources
@@ -46,13 +55,23 @@ def save_message(
     return payload
 
 
-def list_messages(context_id: str) -> list[dict]:
+def list_messages(context_id: str, user_id: str | None = None) -> list[dict]:
+    """Return messages for a context.
+
+    If `user_id` is supplied only that user's messages are returned (USER role).
+    Passing `user_id=None` returns all messages in the context (ADMIN/SUPERADMIN).
+    """
+    must = [
+        models.FieldCondition(key="context_id", match=models.MatchValue(value=context_id)),
+    ]
+    if user_id:
+        must.append(
+            models.FieldCondition(key="user_id", match=models.MatchValue(value=user_id))
+        )
     client = get_client()
     results, _ = client.scroll(
         collection_name=settings.qdrant_chat_collection,
-        scroll_filter=models.Filter(must=[
-            models.FieldCondition(key="context_id", match=models.MatchValue(value=context_id)),
-        ]),
+        scroll_filter=models.Filter(must=must),
         limit=2000,
         with_payload=True,
         with_vectors=False,

@@ -61,3 +61,17 @@ export interface IngestionResult {
 }
 
 export type Lang = 'en' | 'pl'
+
+export interface OrgMember {
+  id:         string
+  role:       string
+  full_name:  string | null
+  created_at: string
+}
+
+export interface Organization {
+  id:         string
+  name:       string
+  created_at: string
+  created_by: string
+}

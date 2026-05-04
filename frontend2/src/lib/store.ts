@@ -1,13 +1,20 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import type { AppRole } from './supabase'
 import type { Context, Lang, Message } from './types'
 
 interface AppState {
   lang:          Lang
   activeContext: Context | null
   messages:      Message[]
-  // TTS — persisted so the preference survives page reloads
   ttsEnabled:    boolean
+
+  // Auth state — populated from Supabase session on mount, not persisted
+  userId:   string | null
+  orgId:    string | null
+  role:     AppRole | null
+  fullName: string | null
+
   setLang:          (lang: Lang)          => void
   setActiveContext: (ctx: Context | null) => void
   setMessages:      (msgs: Message[])     => void
@@ -15,6 +22,9 @@ interface AppState {
   updateMessage:    (timestamp: string, updater: (msg: Message) => Message) => void
   removeMessage:    (timestamp: string)   => void
   setTtsEnabled:    (on: boolean)         => void
+
+  setAuth: (userId: string, orgId: string, role: AppRole, fullName: string) => void
+  clearAuth: () => void
 }
 
 export const useAppStore = create<AppState>()(
@@ -23,7 +33,12 @@ export const useAppStore = create<AppState>()(
       lang:          'en',
       activeContext: null,
       messages:      [],
-      ttsEnabled:    true,           // voice ON by default
+      ttsEnabled:    true,
+      userId:        null,
+      orgId:         null,
+      role:          null,
+      fullName:      null,
+
       setLang:          (lang) => set({ lang }),
       setActiveContext: (ctx)  => set({ activeContext: ctx, messages: [] }),
       appendMessage:    (msg)     => set((s) => ({ messages: [...s.messages, msg] })),
@@ -31,14 +46,13 @@ export const useAppStore = create<AppState>()(
       removeMessage:    (ts)      => set((s) => ({ messages: s.messages.filter(m => m.timestamp !== ts) })),
       setMessages:      (msgs)    => set({ messages: msgs }),
       setTtsEnabled:    (on)      => set({ ttsEnabled: on }),
+
+      setAuth: (userId, orgId, role, fullName) => set({ userId, orgId, role, fullName }),
+      clearAuth: () => set({ userId: null, orgId: null, role: null, fullName: null, activeContext: null, messages: [] }),
     }),
     {
       name:       'researchmind-settings',
       partialize: (s) => ({ ttsEnabled: s.ttsEnabled }),
-      // React 19 concurrent mode reads localStorage synchronously during hydration,
-      // which triggers a state update mid-hydration and causes error #185.
-      // skipHydration keeps the default values during the initial render so the
-      // server-rendered HTML matches; providers.tsx calls rehydrate() after mount.
       skipHydration: true,
     },
   ),

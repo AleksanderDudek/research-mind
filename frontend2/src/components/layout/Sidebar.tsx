@@ -1,8 +1,10 @@
 'use client'
 
-import { MessageSquare, FileText, History, Settings, Languages } from 'lucide-react'
+import { MessageSquare, FileText, History, Settings, Languages, LogOut, ShieldCheck } from 'lucide-react'
 import { useTranslations, useLocale } from 'next-intl'
 import { cn } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
+import { useAppStore } from '@/lib/store'
 import type { Context } from '@/lib/types'
 
 export type SidebarTab = 'chat' | 'sources' | 'history' | 'settings'
@@ -23,9 +25,14 @@ const NAV: { id: SidebarTab; Icon: typeof MessageSquare; labelKey: string; badge
 ]
 
 export function Sidebar({ ctx, tab, sourceCount, onTab, onBack }: Props) {
-  const t      = useTranslations()
-  const locale = useLocale()
+  const t           = useTranslations()
+  const locale      = useLocale()
   const targetLocale = locale === 'en' ? 'pl' : 'en'
+  const role        = useAppStore(s => s.role)
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+  }
 
   return (
     <aside className="hidden md:flex flex-col w-sidebar shrink-0 border-r bg-card h-dvh sticky top-0">
@@ -62,7 +69,19 @@ export function Sidebar({ ctx, tab, sourceCount, onTab, onBack }: Props) {
         ))}
       </nav>
 
-      <div className="px-4 py-3 border-t">
+      <div className="px-4 py-3 border-t space-y-2">
+        {/* Admin / superadmin link */}
+        {(role === 'admin' || role === 'superadmin') && (
+          <a
+            href={role === 'superadmin' ? `/${locale}/superadmin` : `/${locale}/admin`}
+            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
+          >
+            <ShieldCheck size={14} />
+            {role === 'superadmin' ? t('superAdminPanel') : t('adminPanel')}
+          </a>
+        )}
+
+        {/* Language toggle */}
         <a
           href={`/${targetLocale}`}
           className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
@@ -70,6 +89,16 @@ export function Sidebar({ ctx, tab, sourceCount, onTab, onBack }: Props) {
           <Languages size={14} />
           {t('langToggle')}
         </a>
+
+        {/* Sign out */}
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="flex items-center gap-2 text-xs text-muted-foreground hover:text-destructive transition-colors w-full"
+        >
+          <LogOut size={14} />
+          {t('authSignOut')}
+        </button>
       </div>
     </aside>
   )

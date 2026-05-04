@@ -2,6 +2,7 @@ import type {
   AgentResult, Context, HistoryEntry, IngestionResult,
   Message, SearchHit, Source, SourceDetail,
 } from './types'
+import { supabase } from './supabase'
 
 export type StreamEvent =
   | { type: 'chunk'; text: string }
@@ -12,6 +13,12 @@ const base = () =>
     ? (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8001')
     : (process.env.BACKEND_URL ?? 'http://localhost:8001')
 
+async function _getToken(): Promise<string | null> {
+  if (globalThis.window === undefined) return null
+  const { data } = await supabase.auth.getSession()
+  return data.session?.access_token ?? null
+}
+
 async function req<T>(
   method: string,
   path: string,
@@ -19,13 +26,17 @@ async function req<T>(
   form?: FormData,
   signal?: AbortSignal,
 ): Promise<T> {
+  const token = await _getToken()
   const init: RequestInit = { method, signal }
+  const headers: Record<string, string> = {}
+  if (token) headers['Authorization'] = `Bearer ${token}`
   if (form) {
     init.body = form
   } else if (body !== undefined) {
-    init.headers = { 'Content-Type': 'application/json' }
+    headers['Content-Type'] = 'application/json'
     init.body = JSON.stringify(body)
   }
+  init.headers = headers
   const res = await fetch(`${base()}${path}`, init)
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
@@ -74,9 +85,13 @@ export const query = {
     contextId: string | null,
     signal?: AbortSignal,
   ): AsyncGenerator<StreamEvent> {
+    const token = await _getToken()
     const res = await fetch(`${base()}/query/ask/stream`, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type':  'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
       body:    JSON.stringify({ question, context_id: contextId }),
       signal,
     })
@@ -141,4 +156,22 @@ export const ingest = {
     fd.append('context_id', contextId)
     return req<IngestionResult>('POST', '/ingest/audio-upload', undefined, fd)
   },
+}
+
+// ── Org management ────────────────────────────────────────────────────────────
+export const org = {
+  members: () =>
+    req<{ id: string; role: string; full_name: string; created_at: string }[]>('GET', '/org/members'),
+
+  invite: (email: string) =>
+    req<{ invited: string }>('POST', '/org/invite', { email }),
+
+  removeMember: (userId: string) =>
+    req<{ removed: string }>('DELETE', `/org/members/${userId}`),
+
+  allOrgs: () =>
+    req<{ id: string; name: string; created_at: string; created_by: string }[]>('GET', '/superadmin/orgs'),
+
+  appoint: (userId: string, role: string) =>
+    req<{ user_id: string; role: string }>('POST', '/superadmin/appoint', { user_id: userId, role }),
 }

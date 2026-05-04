@@ -3,6 +3,7 @@
 import { MessageSquare, FileText, History, Settings } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
+import { useAppStore } from '@/lib/store'
 import type { SidebarTab } from './Sidebar'
 
 interface Props {
@@ -18,12 +19,17 @@ const TABS: { id: SidebarTab; Icon: typeof MessageSquare; labelKey: string }[] =
 ]
 
 export function BottomTabs({ tab, onTab }: Props) {
-  const t = useTranslations()
+  const t    = useTranslations()
+  const role = useAppStore(s => s.role)
+  // USERs cannot access Sources or Settings — hide those tabs for them
+  const visibleTabs = role === 'user'
+    ? TABS.filter(tb => tb.id === 'chat' || tb.id === 'history')
+    : TABS
 
   return (
     <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 border-t bg-card/95 backdrop-blur-sm">
       <div className="flex">
-        {TABS.map(({ id, Icon, labelKey }) => (
+        {visibleTabs.map(({ id, Icon, labelKey }) => (
           <button
             key={id}
             type="button"

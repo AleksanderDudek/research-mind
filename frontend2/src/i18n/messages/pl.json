@@ -113,5 +113,31 @@
   "startRecording": "Zacznij nagrywać",
   "maxDuration": "Maks. {n} minut",
   "timeRemaining": "Pozostało {t}",
-  "transcribeAndAdd": "Transkrybuj i dodaj jako źródło"
+  "transcribeAndAdd": "Transkrybuj i dodaj jako źródło",
+
+  "authSignIn": "Zaloguj się",
+  "authSignInSubtitle": "Zaloguj się na swoje konto",
+  "authSigningIn": "Logowanie…",
+  "authSignUp": "Zarejestruj się",
+  "authSignOut": "Wyloguj się",
+  "authCreateAccount": "Utwórz konto",
+  "authCreatingAccount": "Tworzenie konta…",
+  "authEmail": "Adres email",
+  "authPassword": "Hasło (min 8 znaków)",
+  "authPasswordMin": "Hasło musi mieć co najmniej 8 znaków.",
+  "authFullName": "Imię i nazwisko",
+  "authOrgName": "Nazwa organizacji (opcjonalnie)",
+  "authNoAccount": "Nie masz konta?",
+  "authHaveAccount": "Masz już konto?",
+
+  "adminPanel": "Panel admina",
+  "adminInviteUser": "Zaproś użytkownika",
+  "adminInvite": "Zaproś",
+  "adminInviteSent": "Zaproszenie wysłane do {email}",
+  "adminMembers": "Członkowie organizacji",
+  "adminRemoveMember": "Usuń z organizacji",
+  "adminMemberRemoved": "Członek usunięty",
+  "adminAllOrgs": "Wszystkie organizacje",
+
+  "superAdminPanel": "Super Admin"
 }

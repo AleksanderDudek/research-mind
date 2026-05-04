@@ -18,7 +18,7 @@ _list_cache: TTLCache = TTLCache(maxsize=256, ttl=60)
 def _ensure_collection() -> None:
     created = ensure_collection(
         settings.qdrant_sources_collection,
-        indexes=["context_id", "document_id", "source_type"],
+        indexes=["context_id", "document_id", "source_type", "org_id"],
     )
     if created:
         logger.info(f"Created collection: {settings.qdrant_sources_collection}")
@@ -32,6 +32,7 @@ def save_source(
     raw_text: str,
     url: str | None,
     chunk_count: int,
+    org_id: str = "",
     image_data: str | None = None,
     image_mime_type: str | None = None,
 ) -> dict:
@@ -44,6 +45,7 @@ def save_source(
         "raw_text":    raw_text,
         "url":         url,
         "chunk_count": chunk_count,
+        "org_id":      org_id,
         "ingested_at": datetime.now(timezone.utc).isoformat(),
     }
     if image_data:

@@ -40,6 +40,7 @@ class IngestionService:
         title: str,
         url: str | None = None,
         extra_payload: dict | None = None,
+        org_id: str = "",
     ) -> dict:
         document_id = str(uuid.uuid4())
         points, chunks = build_chunk_points(
@@ -67,38 +68,39 @@ class IngestionService:
             raw_text=text,
             url=url,
             chunk_count=len(chunks),
+            org_id=org_id,
         )
 
     # ── Public API ─────────────────────────────────────────────────────────────
 
-    def ingest_raw_text(self, text: str, title: str, context_id: str) -> dict:
+    def ingest_raw_text(self, text: str, title: str, context_id: str, org_id: str = "") -> dict:
         return self._ingest_text(
             text=text, source_type=SourceType.TEXT,
-            context_id=context_id, title=title,
+            context_id=context_id, title=title, org_id=org_id,
         )
 
-    def ingest_pdf_bytes(self, pdf_bytes: bytes, source: str, context_id: str) -> dict:
+    def ingest_pdf_bytes(self, pdf_bytes: bytes, source: str, context_id: str, org_id: str = "") -> dict:
         text = self._pdf_parser.parse_bytes(pdf_bytes)
         meta = self._pdf_parser.metadata(pdf_bytes)
         return self._ingest_text(
             text=text, source_type=SourceType.PDF,
             context_id=context_id, title=source,
-            url=source, extra_payload=meta,
+            url=source, extra_payload=meta, org_id=org_id,
         )
 
-    async def ingest_pdf_url(self, url: str, context_id: str) -> dict:
+    async def ingest_pdf_url(self, url: str, context_id: str, org_id: str = "") -> dict:
         pdf_bytes = await self._scraper.fetch_pdf(url)
-        return self.ingest_pdf_bytes(pdf_bytes, source=url, context_id=context_id)
+        return self.ingest_pdf_bytes(pdf_bytes, source=url, context_id=context_id, org_id=org_id)
 
-    async def ingest_web_url(self, url: str, context_id: str) -> dict:
+    async def ingest_web_url(self, url: str, context_id: str, org_id: str = "") -> dict:
         text, meta = await self._scraper.fetch_and_extract(url)
         return self._ingest_text(
             text=text, source_type=SourceType.WEB,
             context_id=context_id, title=meta.get("title", url),
-            url=url, extra_payload=meta,
+            url=url, extra_payload=meta, org_id=org_id,
         )
 
-    def ingest_audio_bytes(self, audio_bytes: bytes, filename: str, context_id: str) -> dict:
+    def ingest_audio_bytes(self, audio_bytes: bytes, filename: str, context_id: str, org_id: str = "") -> dict:
         logger.info(f"Transcribing audio {filename!r}")
         transcription = self._transcriber.transcribe(audio_bytes, filename)
         if not transcription.strip():
@@ -109,6 +111,7 @@ class IngestionService:
             context_id=context_id,
             title=filename,
             url=filename,
+            org_id=org_id,
         )
 
     async def ingest_image_bytes(
@@ -117,6 +120,7 @@ class IngestionService:
         filename: str,
         context_id: str,
         detail_level: str = DetailLevel.STANDARD,
+        org_id: str = "",
     ) -> dict:
         mime_type, _ = mimetypes.guess_type(filename)
         if not mime_type or not mime_type.startswith("image/"):
@@ -145,6 +149,7 @@ class IngestionService:
             raw_text=description,
             url=None,
             chunk_count=len(chunks),
+            org_id=org_id,
             image_data=image_b64,
             image_mime_type=mime_type,
         )
