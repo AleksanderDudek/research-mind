@@ -33,9 +33,13 @@ export const useAppStore = create<AppState>()(
       setTtsEnabled:    (on)      => set({ ttsEnabled: on }),
     }),
     {
-      name:    'researchmind-settings',
-      // Only persist user preferences — not session data
+      name:       'researchmind-settings',
       partialize: (s) => ({ ttsEnabled: s.ttsEnabled }),
+      // React 19 concurrent mode reads localStorage synchronously during hydration,
+      // which triggers a state update mid-hydration and causes error #185.
+      // skipHydration keeps the default values during the initial render so the
+      // server-rendered HTML matches; providers.tsx calls rehydrate() after mount.
+      skipHydration: true,
     },
   ),
 )
