@@ -1,13 +1,7 @@
-# Render.com deployment config
-# Docs: https://render.com/docs/blueprint-spec
+# Render.com deployment config — backend only
+# Frontend is served via GitHub Pages (static export)
 #
-# Setup steps:
-#   1. Fork this repo to your GitHub account
-#   2. Connect repo to Render → New → Blueprint
-#   3. Set secret env vars in Render dashboard (marked sync: false below)
-#   4. Add GitHub Actions secrets:
-#      RENDER_DEPLOY_HOOK_BACKEND  (from Render service settings)
-#      RENDER_DEPLOY_HOOK_FRONTEND (from Render service settings)
+# Setup: Connect repo → New → Blueprint, then set secret env vars in Render dashboard
 
 services:
   - type: web
@@ -23,9 +17,9 @@ services:
       - key: LLM_MODEL
         value: llama-3.1-8b-instant
       - key: LITELLM_API_KEY
-        sync: false       # set in Render dashboard → GROQ_API_KEY
+        sync: false
       - key: QDRANT_HOST
-        sync: false       # e.g. xyz.eu-central.aws.cloud.qdrant.io
+        sync: false
       - key: QDRANT_PORT
         value: "6333"
       - key: QDRANT_API_KEY
@@ -36,20 +30,9 @@ services:
         value: all-MiniLM-L6-v2
       - key: EMBEDDING_DIM
         value: "384"
-      - key: LANGFUSE_PUBLIC_KEY
-        value: ""
-      - key: LANGFUSE_SECRET_KEY
-        value: ""
-
-  - type: web
-    name: researchmind-frontend
-    runtime: docker
-    dockerfilePath: ./frontend/Dockerfile
-    dockerContext: ./frontend
-    plan: free
-    envVars:
-      - key: BACKEND_URL
-        fromService:
-          name: researchmind-backend
-          type: web
-          property: host
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false

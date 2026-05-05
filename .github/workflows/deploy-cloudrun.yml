@@ -56,25 +56,10 @@ jobs:
             LITELLM_API_KEY=${{ secrets.GROQ_API_KEY }}
             QDRANT_HOST=${{ secrets.QDRANT_HOST }}
             QDRANT_API_KEY=${{ secrets.QDRANT_API_KEY }}
+            SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+            SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }}
+            SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
 
-      - name: Deploy frontend
-        id: frontend
-        uses: google-github-actions/deploy-cloudrun@v2
-        with:
-          service: researchmind-frontend
-          image: europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/researchmind/researchmind-frontend:latest
-          region: ${{ vars.GCP_REGION }}
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-          flags: >-
-            --allow-unauthenticated
-            --port=8501
-            --memory=512Mi
-            --cpu=1
-            --min-instances=0
-            --max-instances=2
-          env_vars: BACKEND_URL=${{ steps.backend.outputs.url }}
-
-      - name: Print URLs
+      - name: Print backend URL
         run: |
-          echo "Backend:  ${{ steps.backend.outputs.url }}"
-          echo "Frontend: ${{ steps.frontend.outputs.url }}"
+          echo "Backend: ${{ steps.backend.outputs.url }}"
