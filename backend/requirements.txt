@@ -42,5 +42,5 @@ cachetools==5.5.2          # TTL/LRU in-process caches for responses, embeddings
 langfuse>=2.0.0
 
 # Auth
-PyJWT>=2.8.0           # local JWT verification (no Supabase round-trip per request)
+PyJWT[crypto]>=2.8.0   # JWT verification — [crypto] extra adds EC/RSA key support for ES256
 supabase>=2.0.0        # Supabase Python client (admin invite operations)

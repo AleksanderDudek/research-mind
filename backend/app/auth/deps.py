@@ -2,13 +2,13 @@
 
 Strategy
 --------
-1. Decode the Supabase JWT locally (no network call) using SUPABASE_JWT_SECRET.
+1. Verify the JWT using Supabase's JWKS endpoint (supports both ES256 and HS256).
+   ES256 is the default for newer Supabase projects; HS256 for legacy ones.
+   The JWKS client caches the public key locally for 10 minutes.
 2. Extract user_id from `sub` claim.
 3. Fetch org_id + role from the `profiles` table via Supabase REST API,
    with a short in-process TTL cache so we don't hit Supabase on every request.
 4. Return an AuthUser dataclass that routers can use for access control.
-
-The TTL cache means role changes propagate within ~60 s — acceptable for SaaS.
 """
 from __future__ import annotations
 
@@ -18,15 +18,17 @@ from typing import Annotated
 
 import httpx
 import jwt
+from jwt import PyJWKClient
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from loguru import logger
 
 from app.config import settings
 
-# ── In-process profile cache ──────────────────────────────────────────────────
-_CACHE_TTL = 60  # seconds
+# ── In-process caches ─────────────────────────────────────────────────────────
+_CACHE_TTL = 60  # profile cache TTL in seconds
 _profile_cache: dict[str, tuple[float, "AuthUser"]] = {}
+_jwks_client: PyJWKClient | None = None   # singleton, lazy-init
 
 
 @dataclass
@@ -42,19 +44,39 @@ class AuthUser:
 _bearer = HTTPBearer(auto_error=True)
 
 
-def _decode_jwt(token: str) -> dict:
-    """Verify Supabase JWT signature and return payload. Raises 401 on failure."""
-    secret = settings.supabase_jwt_secret
-    if not secret:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Auth not configured (SUPABASE_JWT_SECRET missing)",
+def _get_jwks_client() -> PyJWKClient:
+    """Return (and lazily create) the singleton JWKS client.
+
+    Fetches Supabase's public keys from:
+      {SUPABASE_URL}/auth/v1/.well-known/jwks.json
+    Works for both ES256 (new projects) and HS256 (legacy projects).
+    Keys are cached locally for 10 minutes.
+    """
+    global _jwks_client
+    if _jwks_client is None:
+        url = settings.supabase_url
+        if not url:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Auth not configured (SUPABASE_URL missing)",
+            )
+        _jwks_client = PyJWKClient(
+            f"{url}/auth/v1/.well-known/jwks.json",
+            cache_jwk_set=True,
+            lifespan=600,   # 10-minute local key cache
         )
+    return _jwks_client
+
+
+def _decode_jwt(token: str) -> dict:
+    """Verify Supabase JWT using JWKS public key. Raises 401/503 on failure."""
     try:
+        client = _get_jwks_client()
+        signing_key = client.get_signing_key_from_jwt(token)
         return jwt.decode(
             token,
-            secret,
-            algorithms=["HS256"],
+            signing_key.key,
+            algorithms=["ES256", "HS256"],   # ES256 = new Supabase, HS256 = legacy
             audience="authenticated",
             options={"verify_exp": True},
         )
@@ -63,6 +85,14 @@ def _decode_jwt(token: str) -> dict:
     except jwt.PyJWTError as exc:
         logger.debug(f"JWT decode failed: {exc}")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"JWKS fetch failed: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Auth service unavailable",
+        )
 
 
 # ── Profile fetch (cached) ────────────────────────────────────────────────────
@@ -136,7 +166,7 @@ def get_current_user(
             email=payload.get("email", ""),
         )
 
-    # Slow path: fetch from Supabase (cached 60 s)
+    # Slow path: fetch from Supabase profiles table (cached 60 s)
     auth_user = _fetch_profile(user_id)
     auth_user.email = payload.get("email", "")
     return auth_user
