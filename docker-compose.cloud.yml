@@ -3,7 +3,7 @@
 #
 # Replaces: ollama + litellm (local LLM) → Groq API
 # Replaces: qdrant (self-hosted) → Qdrant Cloud
-# Keeps:    backend, frontend, langfuse
+# Keeps:    backend, langfuse
 
 services:
   ollama:
@@ -17,21 +17,13 @@ services:
 
   backend:
     environment:
-      # Groq replaces Ollama + LiteLLM proxy
       LITELLM_BASE_URL: https://api.groq.com/openai
       LITELLM_API_KEY: ${GROQ_API_KEY}
       LLM_MODEL: llama-3.1-8b-instant
-      # Qdrant Cloud replaces local Qdrant
       QDRANT_HOST: ${QDRANT_CLOUD_HOST}
       QDRANT_PORT: "6333"
       QDRANT_API_KEY: ${QDRANT_CLOUD_API_KEY}
       QDRANT_LOCAL_PATH: ""
-      # Embeddings — keep small model to fit in free tier RAM
       EMBEDDING_MODEL: all-MiniLM-L6-v2
       EMBEDDING_DIM: "384"
-    depends_on: []
-
-  frontend:
-    environment:
-      BACKEND_URL: ${BACKEND_URL:-http://backend:8000}
     depends_on: []

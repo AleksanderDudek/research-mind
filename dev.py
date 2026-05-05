@@ -6,13 +6,13 @@ Usage:
     python dev.py <service> <command>
     python dev.py <command>              # targets all services
 
-Services:  backend  frontend  all (default)
+Services:  backend  frontend2  all (default)
 Commands:  start  stop  restart  status  logs
 
 Examples:
-    python dev.py start                  # start backend + frontend
+    python dev.py start                  # start backend + frontend2
     python dev.py backend start          # start backend only
-    python dev.py frontend restart       # restart frontend only
+    python dev.py frontend2 restart      # restart frontend2 only
     python dev.py status                 # status of all services
     python dev.py backend logs           # tail backend logs
 """
@@ -37,14 +37,6 @@ SERVICES: dict[str, dict] = {
         "cmd":   ["app.main:app", "--reload", "--port", "8001"],
         "color": "\033[34m",   # blue
         "setup": "cd backend && uv venv && uv pip install -r requirements.txt",
-    },
-    "frontend": {
-        "dir":   ROOT / "frontend",
-        "port":  8501,
-        "exe":   "frontend/.venv/bin/streamlit",
-        "cmd":   ["run", "app.py", "--server.port", "8501"],
-        "color": "\033[32m",   # green
-        "setup": "cd frontend && uv venv && uv pip install -r requirements.txt",
     },
     "frontend2": {
         "dir":   ROOT / "frontend2",
@@ -175,7 +167,6 @@ def svc_status(names: list[str]) -> None:
 
 
 def svc_logs(names: list[str]) -> None:
-    """Re-attach to running processes isn't possible; show last lines from log files if any."""
     print(f"{_DIM}Tip: logs stream live when you use 'start'. "
           f"For a running process, use:  lsof -p <PID>{_RESET}")
     svc_status(names)
@@ -196,7 +187,7 @@ _HELP = """\
 
 {bold}Services{reset} (optional, default = all):
   backend    FastAPI on :8001
-  frontend   Streamlit on :8501
+  frontend2  Next.js on :3000
   all        Both (default when omitted)
 
 {bold}Commands{reset}:
@@ -209,7 +200,7 @@ _HELP = """\
 {bold}Examples{reset}:
   python dev.py start                  start both
   python dev.py backend start          start backend only
-  python dev.py frontend restart       restart frontend only
+  python dev.py frontend2 restart      restart frontend2 only
   python dev.py all status             status of all services
   python dev.py stop                   stop both
 """.format(bold=_BOLD, reset=_RESET)
@@ -222,7 +213,6 @@ def main() -> None:
         print(_HELP)
         sys.exit(0)
 
-    # Determine service(s) and command
     if args[0] in SERVICES:
         names   = [args[0]]
         cmd_arg = args[1] if len(args) > 1 else None
