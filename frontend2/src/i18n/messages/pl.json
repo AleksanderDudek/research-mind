@@ -139,5 +139,10 @@
   "adminMemberRemoved": "Członek usunięty",
   "adminAllOrgs": "Wszystkie organizacje",
 
-  "superAdminPanel": "Super Admin"
+  "superAdminPanel": "Super Admin",
+
+  "navManagement":  "Zarządzanie",
+  "navTeam":        "Zespół i zaproszenia",
+  "navAllOrgs":     "Wszystkie organizacje",
+  "navManageTeam":  "Zarządzaj zespołem"
 }

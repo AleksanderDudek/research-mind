@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { Plus, Search } from 'lucide-react'
+import { Plus, Search, Users, Building2, ChevronRight } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { contexts as api } from '@/lib/api'
 import type { Context } from '@/lib/types'
@@ -66,6 +66,46 @@ export function ContextPanel() {
 
       {/* Main */}
       <main className="flex-1 max-w-content mx-auto w-full px-4 py-8 space-y-8">
+        {/* Management nav — visible to admins and superadmins */}
+        {isAdmin && (
+          <section>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
+              {t('navManagement')}
+            </p>
+            <div className="space-y-2">
+              <Link
+                href="/admin"
+                className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3 hover:border-primary/40 hover:bg-accent/30 transition-all group"
+              >
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                  <Users size={15} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">{t('navTeam')}</p>
+                  <p className="text-xs text-muted-foreground">{t('adminInviteUser')}</p>
+                </div>
+                <ChevronRight size={15} className="text-muted-foreground group-hover:text-primary transition-colors" />
+              </Link>
+
+              {role === 'superadmin' && (
+                <Link
+                  href="/superadmin"
+                  className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3 hover:border-primary/40 hover:bg-accent/30 transition-all group"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                    <Building2 size={15} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{t('navAllOrgs')}</p>
+                    <p className="text-xs text-muted-foreground">{t('adminAllOrgs')}</p>
+                  </div>
+                  <ChevronRight size={15} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                </Link>
+              )}
+            </div>
+          </section>
+        )}
+
         {/* Create — only ADMINs and SUPERADMINs can create contexts */}
         {isAdmin && (
           <section>
