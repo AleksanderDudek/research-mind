@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from threading import Lock, RLock
 from typing import Annotated
 
 import httpx
@@ -26,9 +27,15 @@ from loguru import logger
 from app.config import settings
 
 # ── In-process caches ─────────────────────────────────────────────────────────
+# Both caches are protected with locks because FastAPI runs handlers in a
+# thread pool (sync routes) and asyncio tasks may spawn threads via executors.
+# Without locks, concurrent requests race on dict/TTLCache operations.
 _CACHE_TTL = 60  # profile cache TTL in seconds
 _profile_cache: dict[str, tuple[float, "AuthUser"]] = {}
-_jwks_client: PyJWKClient | None = None   # singleton, lazy-init
+_profile_lock = RLock()   # re-entrant so the same thread can re-acquire
+
+_jwks_client: PyJWKClient | None = None
+_jwks_lock = Lock()       # plain Lock is fine; JWKS init is never re-entrant
 
 
 @dataclass
@@ -47,24 +54,25 @@ _bearer = HTTPBearer(auto_error=True)
 def _get_jwks_client() -> PyJWKClient:
     """Return (and lazily create) the singleton JWKS client.
 
-    Fetches Supabase's public keys from:
-      {SUPABASE_URL}/auth/v1/.well-known/jwks.json
-    Works for both ES256 (new projects) and HS256 (legacy projects).
-    Keys are cached locally for 10 minutes.
+    Uses double-checked locking so at most one thread creates the client even
+    under burst traffic. The outer check avoids the lock on every request
+    after initialisation.
     """
     global _jwks_client
     if _jwks_client is None:
-        url = settings.supabase_url
-        if not url:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Auth not configured (SUPABASE_URL missing)",
-            )
-        _jwks_client = PyJWKClient(
-            f"{url}/auth/v1/.well-known/jwks.json",
-            cache_jwk_set=True,
-            lifespan=600,   # 10-minute local key cache
-        )
+        with _jwks_lock:
+            if _jwks_client is None:   # re-check inside the lock
+                url = settings.supabase_url
+                if not url:
+                    raise HTTPException(
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        detail="Auth not configured (SUPABASE_URL missing)",
+                    )
+                _jwks_client = PyJWKClient(
+                    f"{url}/auth/v1/.well-known/jwks.json",
+                    cache_jwk_set=True,
+                    lifespan=600,
+                )
     return _jwks_client
 
 
@@ -104,9 +112,10 @@ def _fetch_profile(user_id: str) -> AuthUser:
     Result is cached in-process for _CACHE_TTL seconds.
     """
     now = time.monotonic()
-    cached = _profile_cache.get(user_id)
-    if cached and (now - cached[0]) < _CACHE_TTL:
-        return cached[1]
+    with _profile_lock:
+        cached = _profile_cache.get(user_id)
+        if cached and (now - cached[0]) < _CACHE_TTL:
+            return cached[1]
 
     url = f"{settings.supabase_url}/rest/v1/profiles"
     headers = {
@@ -136,13 +145,15 @@ def _fetch_profile(user_id: str) -> AuthUser:
         org_id=row.get("org_id") or "",
         role=row.get("role") or "user",
     )
-    _profile_cache[user_id] = (now, auth_user)
+    with _profile_lock:
+        _profile_cache[user_id] = (now, auth_user)
     return auth_user
 
 
 def invalidate_cache(user_id: str) -> None:
     """Remove cached profile entry — call after role/org changes."""
-    _profile_cache.pop(user_id, None)
+    with _profile_lock:
+        _profile_cache.pop(user_id, None)
 
 
 # ── FastAPI dependency ─────────────────────────────────────────────────────────

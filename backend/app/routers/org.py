@@ -8,6 +8,7 @@ DELETE /org/members/{uid}   remove a user from the org           (admin+)
 GET  /superadmin/orgs       list all organisations               (superadmin)
 POST /superadmin/appoint    promote user to superadmin           (superadmin)
 """
+import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from loguru import logger
@@ -58,7 +59,6 @@ class AppointRequest(BaseModel):
 def list_members(user: AuthUserDep) -> list:
     """List all profiles in the caller's organisation."""
     require_admin(user)
-    import httpx
     resp = httpx.get(
         _rest("profiles"),
         headers=_supabase_headers(),
@@ -102,7 +102,6 @@ async def invite_member(req: InviteRequest, user: AuthUserDep) -> dict:
 def remove_member(member_id: str, user: AuthUserDep) -> dict:
     """Remove a user from the organisation (sets their org_id to null)."""
     require_admin(user)
-    import httpx
 
     # Verify the member belongs to the same org
     check = httpx.get(
@@ -131,7 +130,6 @@ def remove_member(member_id: str, user: AuthUserDep) -> dict:
 def list_all_orgs(user: AuthUserDep) -> list:
     """List all organisations with member counts. Superadmins only."""
     require_superadmin(user)
-    import httpx
     resp = httpx.get(
         _rest("organizations"),
         headers=_supabase_headers(),
@@ -149,7 +147,6 @@ def appoint_role(req: AppointRequest, user: AuthUserDep) -> dict:
     against the platform_config `max_superadmins` value.
     """
     require_superadmin(user)
-    import httpx
 
     if req.role not in ("superadmin", "admin", "user"):
         raise HTTPException(status_code=400, detail="role must be superadmin, admin, or user")

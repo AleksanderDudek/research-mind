@@ -21,10 +21,11 @@ const TABS: { id: SidebarTab; Icon: typeof MessageSquare; labelKey: string }[] =
 export function BottomTabs({ tab, onTab }: Props) {
   const t    = useTranslations()
   const role = useAppStore(s => s.role)
-  // USERs cannot access Sources or Settings — hide those tabs for them
-  const visibleTabs = role === 'user'
-    ? TABS.filter(tb => tb.id === 'chat' || tb.id === 'history')
-    : TABS
+  // Only admins/superadmins see Sources and Settings.
+  // null role (auth still loading) is treated the same as 'user' — fail closed.
+  const visibleTabs = (role === 'admin' || role === 'superadmin')
+    ? TABS
+    : TABS.filter(tb => tb.id === 'chat' || tb.id === 'history')
 
   return (
     <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 border-t bg-card/95 backdrop-blur-sm">

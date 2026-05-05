@@ -6,6 +6,7 @@ Performance additions:
 """
 import hashlib
 import json
+from threading import Lock
 from typing import Annotated
 
 from cachetools import TTLCache
@@ -28,6 +29,7 @@ router = APIRouter(prefix="/query", tags=["query"])
 # across Cloud Run instances, but still eliminates 100% of repeated work within
 # a single instance's lifetime.
 _ask_cache: TTLCache = TTLCache(maxsize=512, ttl=900)  # 15-minute TTL
+_ask_cache_lock = Lock()
 
 
 def _cache_key(question: str, context_id: str | None) -> str:
@@ -110,13 +112,15 @@ async def semantic_search(req: SearchRequest, user: AuthUserDep, embedder: Embed
 async def ask_agent(req: AskRequest, user: AuthUserDep, agent: AgentDep, background: BackgroundTasks) -> dict:
     """Blocking ask — critic runs in the background so it never delays the response."""
     key = _cache_key(req.question, req.context_id)
-    if key in _ask_cache:
-        logger.info("[cache] hit /ask")
-        return _ask_cache[key]
+    with _ask_cache_lock:
+        if key in _ask_cache:
+            logger.info("[cache] hit /ask")
+            return _ask_cache[key]
 
     try:
         result = await agent.run(req.question, context_id=req.context_id, background_tasks=background)
-        _ask_cache[key] = result
+        with _ask_cache_lock:
+            _ask_cache[key] = result
         return result
     except Exception as e:
         logger.exception("Agent failed")
@@ -132,9 +136,10 @@ async def ask_agent_stream(req: AskRequest, user: AuthUserDep, agent: AgentDep) 
     """
     key = _cache_key(req.question, req.context_id)
 
-    if key in _ask_cache:
+    with _ask_cache_lock:
+        cached = _ask_cache.get(key)
+    if cached is not None:
         logger.info("[cache] hit /ask/stream — replaying as instant stream")
-        cached = _ask_cache[key]
 
         async def _replay():
             # Single chunk containing the full cached answer, then done
