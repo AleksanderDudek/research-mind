@@ -68,26 +68,32 @@ def list_members(user: AuthUserDep) -> list:
     return resp.json()
 
 
-@router.post("/org/invite", status_code=200)
-def invite_member(req: InviteRequest, user: AuthUserDep) -> dict:
-    """Invite a user by email — sends a Supabase magic-link invite email."""
+@router.post("/org/invite", status_code=200, responses={409: {"description": "Already registered"}, 502: {"description": "Invite failed"}, 503: {"description": "Auth not configured"}})
+async def invite_member(req: InviteRequest, user: AuthUserDep) -> dict:
+    """Invite a user by email — sends a Supabase magic-link invite email.
+
+    Uses the Supabase Python SDK (supabase.auth.admin.invite_user_by_email)
+    which handles the new sb_secret_* API key format correctly.
+    """
     require_admin(user)
-    import httpx
-    resp = httpx.post(
-        _auth("invite"),
-        headers=_supabase_headers(),
-        json={
-            "email": req.email,
-            "data":  {"invited_org_id": user.org_id},
-        },
-    )
-    if resp.status_code == 422:
-        raise HTTPException(status_code=400, detail="Invalid email address")
-    if resp.status_code == 409:
-        raise HTTPException(status_code=409, detail="User is already registered")
-    if not resp.is_success:
-        logger.error(f"Supabase invite failed: {resp.text}")
-        raise HTTPException(status_code=502, detail="Invite email failed")
+
+    if not settings.supabase_url or not settings.supabase_service_key:
+        raise HTTPException(status_code=503, detail="Auth not configured")
+
+    try:
+        from supabase import create_client, Client
+        sb: Client = create_client(settings.supabase_url, settings.supabase_service_key)
+        sb.auth.admin.invite_user_by_email(
+            req.email,
+            options={"data": {"invited_org_id": user.org_id}},
+        )
+    except Exception as exc:
+        err = str(exc)
+        logger.error(f"Supabase invite failed for {req.email!r}: {err}")
+        if "already been registered" in err or "already exists" in err:
+            raise HTTPException(status_code=409, detail="User is already registered")
+        raise HTTPException(status_code=502, detail=f"Invite failed: {err}")
+
     logger.info(f"Invited {req.email!r} to org {user.org_id!r}")
     return {"invited": req.email}
 
